@@ -5,7 +5,7 @@ import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Prompt } from '@/lib/db';
 import { cn } from '@/lib/utils';
-import { Plus, MoreHorizontal, Sun, Moon, Languages } from 'lucide-react';
+import { Plus, Sun, Moon, Star, Trash2 } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 
@@ -45,16 +45,18 @@ function LangToggle() {
 }
 
 export default function PromptList() {
-  const { activeFolderId, activePromptId, setActivePrompt, createPrompt, searchQuery, setSearchQuery } = usePromptStore();
+  const { activeFolderId, activeTag, activePromptId, setActivePrompt, createPrompt, deletePrompt, searchQuery, setSearchQuery } = usePromptStore();
   const { language } = useSettingsStore();
   const t = i18n[language];
   
-  // Fetch all prompts to filter locally based on current folder/search
   const allPrompts = useLiveQuery(() => db.prompts.toArray()) || [];
   
   const prompts = useMemo(() => {
     let filtered = allPrompts;
-    if (activeFolderId === 'favorites') {
+    
+    if (activeTag) {
+      filtered = filtered.filter(p => p.tags && p.tags.includes(activeTag));
+    } else if (activeFolderId === 'favorites') {
       filtered = filtered.filter(p => p.isFavorite);
     } else if (activeFolderId !== null) {
       filtered = filtered.filter(p => p.folderId === activeFolderId);
@@ -65,9 +67,8 @@ export default function PromptList() {
       filtered = filtered.filter(p => p.title.toLowerCase().includes(q) || p.content.toLowerCase().includes(q));
     }
     
-    // Sort by updated time desc
     return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [allPrompts, activeFolderId, searchQuery]);
+  }, [allPrompts, activeFolderId, activeTag, searchQuery]);
 
   const handleCreate = async () => {
     const id = await createPrompt(activeFolderId === 'favorites' ? null : activeFolderId);
@@ -75,15 +76,17 @@ export default function PromptList() {
   };
 
   return (
-    <div className="w-[320px] h-full bg-background border-r border-border flex flex-col shrink-0">
+    <div className="w-full h-full bg-background border-r border-border flex flex-col shrink-0">
       <div className="h-14 flex items-center px-4 border-b border-border justify-between">
-        <h2 className="font-semibold text-sm">{t.prompts}</h2>
+        <h2 className="font-semibold text-sm truncate pr-2 text-foreground">
+          {activeTag ? `#${activeTag}` : t.prompts}
+        </h2>
         <div className="flex items-center gap-1">
           <LangToggle />
           <ThemeToggle />
           <button 
             onClick={handleCreate}
-            className="w-7 h-7 rounded flex items-center justify-center hover:bg-panel-hover text-gray-400 hover:text-gray-200 transition-colors"
+            className="w-7 h-7 rounded flex items-center justify-center hover:bg-panel-hover text-gray-400 hover:text-foreground transition-colors"
           >
             <Plus size={16} />
           </button>
@@ -96,7 +99,7 @@ export default function PromptList() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t.filter} 
-          className="w-full bg-panel text-sm px-3 py-1.5 rounded-md border border-border focus:border-indigo-500/50 focus:outline-none transition-colors placeholder:text-gray-600"
+          className="w-full bg-panel text-sm px-3 py-1.5 rounded-md border border-border focus:border-indigo-500/50 focus:outline-none transition-colors placeholder:text-gray-500 text-foreground"
         />
       </div>
 
@@ -110,6 +113,10 @@ export default function PromptList() {
               prompt={prompt} 
               isActive={activePromptId === prompt.id}
               onClick={() => setActivePrompt(prompt.id)}
+              onDelete={(e) => {
+                e.stopPropagation();
+                deletePrompt(prompt.id);
+              }}
             />
           ))
         )}
@@ -118,17 +125,16 @@ export default function PromptList() {
   );
 }
 
-function PromptCard({ prompt, isActive, onClick }: { prompt: Prompt, isActive: boolean, onClick: () => void }) {
+function PromptCard({ prompt, isActive, onClick, onDelete }: { prompt: Prompt, isActive: boolean, onClick: () => void, onDelete: (e: any) => void }) {
   const { language } = useSettingsStore();
   const t = i18n[language];
-  // Simple token estimator (words * 1.3)
   const estimatedTokens = Math.ceil((prompt.content.split(/\s+/).filter(Boolean).length || 0) * 1.3);
   
   return (
-    <button
+    <div
       onClick={onClick}
       className={cn(
-        "w-full text-left p-3 rounded-lg border transition-all duration-200 group flex flex-col gap-1.5",
+        "w-full text-left p-3 rounded-lg border transition-all duration-200 group flex flex-col gap-1.5 cursor-pointer",
         isActive 
           ? "bg-panel border-indigo-500/30 shadow-[0_0_10px_rgba(99,102,241,0.05)]" 
           : "bg-transparent border-transparent hover:bg-panel-hover hover:border-border"
@@ -138,8 +144,22 @@ function PromptCard({ prompt, isActive, onClick }: { prompt: Prompt, isActive: b
         <h3 className="font-medium text-sm text-foreground truncate pr-2">
           {prompt.title || t.untitled}
         </h3>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <MoreHorizontal size={14} className="text-gray-500 hover:text-gray-300" />
+        <div className={cn("flex items-center gap-1 transition-opacity", prompt.isFavorite ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              usePromptStore.getState().updatePrompt(prompt.id, { isFavorite: !prompt.isFavorite });
+            }}
+            className="text-gray-400 hover:text-amber-400 transition-colors p-1"
+          >
+            <Star size={12} className={prompt.isFavorite ? "fill-amber-400 text-amber-400" : ""} />
+          </button>
+          <button 
+            onClick={onDelete}
+            className="text-gray-400 hover:text-red-400 transition-colors p-1"
+          >
+            <Trash2 size={12} />
+          </button>
         </div>
       </div>
       
@@ -147,19 +167,18 @@ function PromptCard({ prompt, isActive, onClick }: { prompt: Prompt, isActive: b
         {prompt.content || t.emptyPrompt}
       </p>
       
-      <div className="flex items-center gap-2 mt-1">
-        <span className={cn(
-          "text-[10px] px-1.5 py-0.5 rounded uppercase font-medium tracking-wider",
-          prompt.status === 'active' ? "bg-emerald-500/10 text-emerald-400" :
-          prompt.status === 'draft' ? "bg-gray-500/10 text-gray-400" :
-          "bg-amber-500/10 text-amber-400"
-        )}>
-          {prompt.status}
-        </span>
-        <span className="text-[10px] text-gray-600 font-mono">
+      <div className="flex items-center justify-between mt-1">
+        <div className="flex flex-wrap gap-1">
+          {prompt.tags && prompt.tags.map(tag => (
+            <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded border border-border bg-background text-gray-500 font-medium">
+              #{tag}
+            </span>
+          ))}
+        </div>
+        <span className="text-[10px] text-gray-400 dark:text-gray-600 font-mono shrink-0">
           ~{estimatedTokens} tkns
         </span>
       </div>
-    </button>
+    </div>
   );
 }

@@ -29,7 +29,7 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-64 h-full bg-panel border-r border-border flex flex-col shrink-0">
+    <div className="w-full h-full bg-panel border-r border-border flex flex-col shrink-0">
       {/* Header */}
       <div className="h-14 flex items-center px-4 border-b border-border">
         <div className="flex items-center gap-2 font-medium text-sm text-foreground">
@@ -77,10 +77,36 @@ export default function Sidebar() {
                   onChange={(e) => setNewFolderName(e.target.value)}
                   onBlur={() => setIsCreating(false)}
                   placeholder={t.newFolder}
-                  className="bg-transparent border-none outline-none text-sm w-full text-gray-200 placeholder:text-gray-600"
+                  className="bg-transparent border-none outline-none text-sm w-full text-foreground placeholder:text-gray-600"
                 />
               </form>
             )}
+          </div>
+        </div>
+
+        {/* Tags Section */}
+        <div className="pt-2">
+          <div className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center justify-between">
+            <span>{t.tags}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 px-3">
+            {Array.from(new Set(prompts.flatMap(p => p.tags || []))).map(tag => (
+              <button
+                key={tag}
+                onClick={() => {
+                  const { activeTag, setActiveTag } = usePromptStore.getState();
+                  setActiveTag(activeTag === tag ? null : tag);
+                }}
+                className={cn(
+                  "px-2 py-1 text-[10px] font-medium rounded-full transition-colors border",
+                  usePromptStore.getState().activeTag === tag
+                    ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
+                    : "bg-panel border-border text-gray-500 hover:text-gray-300 hover:border-gray-600"
+                )}
+              >
+                #{tag}
+              </button>
+            ))}
           </div>
         </div>
       </div>

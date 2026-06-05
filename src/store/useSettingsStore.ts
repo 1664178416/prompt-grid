@@ -52,6 +52,15 @@ export const i18n = {
     switchThemeAction: 'Switch Theme',
     switchLangAction: 'Switch Language',
     copySuccess: 'Copied to clipboard!',
+    // Phase 2
+    tags: 'Tags',
+    allTags: 'All Tags',
+    moveFolder: 'Move to Folder...',
+    exportData: 'Export All Data',
+    importData: 'Import Data',
+    exportSuccess: 'Data exported successfully!',
+    importSuccess: 'Data imported successfully!',
+    noFolder: 'No Folder',
   },
   zh: {
     allPrompts: '所有提示词',
@@ -86,5 +95,14 @@ export const i18n = {
     switchThemeAction: '切换外观主题',
     switchLangAction: '切换显示语言',
     copySuccess: '已复制到剪贴板！',
+    // Phase 2
+    tags: '标签',
+    allTags: '全部标签',
+    moveFolder: '移动到文件夹...',
+    exportData: '导出备份数据',
+    importData: '导入备份数据',
+    exportSuccess: '数据导出成功！',
+    importSuccess: '数据导入成功！',
+    noFolder: '未分类',
   }
 };

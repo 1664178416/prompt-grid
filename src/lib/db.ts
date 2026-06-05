@@ -33,6 +33,34 @@ export class PromptGridDatabase extends Dexie {
       folders: 'id, parentId, createdAt',
       prompts: 'id, folderId, *tags, isFavorite, status, createdAt, updatedAt'
     });
+    
+    this.on('populate', async () => {
+      const demoFolderId = crypto.randomUUID();
+      await this.folders.add({
+        id: demoFolderId,
+        name: 'Getting Started',
+        parentId: null,
+        createdAt: Date.now()
+      });
+      
+      await this.prompts.add({
+        id: crypto.randomUUID(),
+        title: '🚀 Welcome to PromptGrid',
+        content: `Hello there! Welcome to PromptGrid, your premium prompt management tool.
+
+Here is how you use dynamic variables:
+You can wrap any word in double curly braces, like this: {{topic}}.
+The right-side Playground will automatically extract it into an input field!
+
+Try changing the {{topic}} and the {{tone}} in the Playground, then hit "Copy Filled Prompt" at the bottom right.`,
+        folderId: demoFolderId,
+        tags: ['tutorial', 'demo'],
+        isFavorite: true,
+        status: 'active',
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+    });
   }
 }
 

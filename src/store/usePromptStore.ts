@@ -6,12 +6,14 @@ interface PromptState {
   // Current active selections
   activeFolderId: string | null;
   activePromptId: string | null;
+  activeTag: string | null;
   searchQuery: string;
   isCommandPaletteOpen: boolean;
 
   // Actions
   setActiveFolder: (id: string | null) => void;
   setActivePrompt: (id: string | null) => void;
+  setActiveTag: (tag: string | null) => void;
   setSearchQuery: (query: string) => void;
   setCommandPaletteOpen: (isOpen: boolean) => void;
 
@@ -27,11 +29,13 @@ interface PromptState {
 export const usePromptStore = create<PromptState>((set, get) => ({
   activeFolderId: null,
   activePromptId: null,
+  activeTag: null,
   searchQuery: '',
   isCommandPaletteOpen: false,
 
-  setActiveFolder: (id) => set({ activeFolderId: id, activePromptId: null }),
+  setActiveFolder: (id) => set({ activeFolderId: id, activeTag: null, activePromptId: null }),
   setActivePrompt: (id) => set({ activePromptId: id }),
+  setActiveTag: (tag) => set({ activeTag: tag, activeFolderId: null, activePromptId: null }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
 

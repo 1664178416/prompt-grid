@@ -4,9 +4,10 @@ import { usePromptStore } from '@/store/usePromptStore';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { useEffect, useState } from 'react';
-import { Play, Copy, Star, Trash2 } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Play, Copy, Star, Trash2, Folder, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import SimpleEditor from 'react-simple-code-editor';
 
 export default function Editor() {
   const { activePromptId, updatePrompt, deletePrompt, setCommandPaletteOpen } = usePromptStore();
@@ -25,6 +26,14 @@ export default function Editor() {
   // Local state for extracted variables
   const [variables, setVariables] = useState<string[]>([]);
   const [filledVars, setFilledVars] = useState<Record<string, string>>({});
+  
+  // Tag input state
+  const [tagInput, setTagInput] = useState('');
+  
+  // Custom dropdown state
+  const [isFolderSelectOpen, setIsFolderSelectOpen] = useState(false);
+  
+  const folders = useLiveQuery(() => db.folders.toArray()) || [];
 
   // Sync state when active prompt changes
   useEffect(() => {
@@ -32,6 +41,7 @@ export default function Editor() {
       setTitle(prompt.title);
       setContent(prompt.content);
       extractVariables(prompt.content);
+      setTagInput('');
     } else {
       setTitle('');
       setContent('');
@@ -39,11 +49,36 @@ export default function Editor() {
     }
   }, [prompt?.id]);
 
+  const addTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      const currentTags = prompt?.tags || [];
+      const newTag = tagInput.trim().toLowerCase();
+      if (!currentTags.includes(newTag)) {
+        updatePrompt(activePromptId!, { tags: [...currentTags, newTag] });
+      }
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    const currentTags = prompt?.tags || [];
+    updatePrompt(activePromptId!, { tags: currentTags.filter(t => t !== tagToRemove) });
+  };
+
   const extractVariables = (text: string) => {
     const regex = /\{\{([^}]+)\}\}/g;
     const matches = Array.from(text.matchAll(regex)).map(m => m[1].trim());
     const uniqueVars = Array.from(new Set(matches));
     setVariables(uniqueVars);
+  };
+
+  const highlightVariables = (code: string) => {
+    return code
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\{\{([^}]+)\}\}/g, '<span class="text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-500/10 px-0.5 rounded">{{$1}}</span>');
   };
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -109,7 +144,7 @@ export default function Editor() {
     <div className="flex-1 h-full flex bg-background">
       {/* Editor Main Area */}
       <div className="flex-1 flex flex-col border-r border-border min-w-0">
-        <div className="h-14 flex items-center px-6 border-b border-border justify-between">
+        <div className="h-14 flex items-center px-6 border-b border-border justify-between bg-panel/30">
           <input
             type="text"
             value={title}
@@ -132,13 +167,98 @@ export default function Editor() {
             </button>
           </div>
         </div>
+
+        {/* Metadata Bar */}
+        <div className="px-6 py-3 border-b border-border bg-panel/10 flex flex-col gap-3">
+          {/* Premium Folder Selector */}
+          <div className="flex items-center gap-2 relative">
+            <span className="text-xs font-medium text-gray-500 w-16 pt-1">{t.moveFolder}</span>
+            <button
+              onClick={() => setIsFolderSelectOpen(!isFolderSelectOpen)}
+              className="bg-background hover:bg-panel-hover border border-border rounded-md text-sm px-3 py-1.5 text-foreground outline-none transition-colors flex items-center justify-between min-w-[180px] shadow-sm"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Folder size={14} className="text-indigo-400 shrink-0" />
+                <span className="truncate">
+                  {prompt.folderId ? folders.find(f => f.id === prompt.folderId)?.name : t.noFolder}
+                </span>
+              </div>
+              <ChevronDown size={14} className="text-gray-500 shrink-0 ml-2" />
+            </button>
+            
+            {isFolderSelectOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setIsFolderSelectOpen(false)} 
+                />
+                <div className="absolute top-full left-[72px] mt-1 w-48 bg-panel border border-border rounded-lg shadow-xl z-50 overflow-hidden flex flex-col py-1 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <button
+                    onClick={() => {
+                      updatePrompt(activePromptId!, { folderId: null });
+                      setIsFolderSelectOpen(false);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors text-left group"
+                  >
+                    <Folder size={14} className="text-gray-400 group-hover:text-indigo-400" />
+                    <span>{t.noFolder}</span>
+                    {!prompt.folderId && <Check size={14} className="ml-auto text-indigo-500" />}
+                  </button>
+                  <div className="h-px bg-border my-1 w-full" />
+                  {folders.map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        updatePrompt(activePromptId!, { folderId: f.id });
+                        setIsFolderSelectOpen(false);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-indigo-500/10 hover:text-indigo-500 transition-colors text-left group"
+                    >
+                      <Folder size={14} className="text-indigo-400/70 group-hover:text-indigo-400" />
+                      <span className="truncate">{f.name}</span>
+                      {prompt.folderId === f.id && <Check size={14} className="ml-auto text-indigo-500" />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          
+          {/* Tag Input */}
+          <div className="flex items-start gap-2">
+            <span className="text-xs font-medium text-gray-500 w-16 pt-1.5">{t.tags}</span>
+            <div className="flex-1 flex flex-wrap gap-2 items-center">
+              {prompt.tags?.map(tag => (
+                <span key={tag} className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                  #{tag}
+                  <button onClick={() => removeTag(tag)} className="hover:text-indigo-500">×</button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={addTag}
+                placeholder="Add tag and press Enter..."
+                className="bg-transparent border-none outline-none text-sm text-foreground placeholder:text-gray-400 dark:placeholder:text-gray-600 w-48 py-1"
+              />
+            </div>
+          </div>
+        </div>
         
-        <div className="flex-1 relative">
-          <textarea
+        <div className="flex-1 relative overflow-y-auto p-6">
+          {content === '' && (
+            <div className="absolute top-6 left-6 text-sm text-gray-400 dark:text-gray-700 pointer-events-none font-sans">
+              {t.writePrompt}
+            </div>
+          )}
+          <SimpleEditor
             value={content}
-            onChange={handleContentChange}
-            placeholder={t.writePrompt}
-            className="absolute inset-0 w-full h-full bg-transparent border-none outline-none resize-none p-6 text-sm text-gray-800 dark:text-gray-300 font-mono leading-relaxed placeholder:text-gray-400 dark:placeholder:text-gray-700 placeholder:font-sans focus:ring-0"
+            onValueChange={val => handleContentChange({ target: { value: val } } as any)}
+            highlight={highlightVariables}
+            padding={0}
+            textareaClassName="focus:outline-none"
+            className="w-full min-h-full text-sm font-mono leading-relaxed text-gray-800 dark:text-gray-300"
           />
         </div>
       </div>

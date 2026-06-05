@@ -5,7 +5,7 @@ import { usePromptStore } from '@/store/usePromptStore';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { Search, FileText, FolderPlus, Plus, Sun, Moon, Languages } from 'lucide-react';
+import { Search, FileText, FolderPlus, Plus, Download, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 
@@ -28,10 +28,52 @@ export default function CommandPalette() {
 
   const actions = [
     { id: 'new-prompt', label: t.createPromptAction, icon: <Plus size={16} /> },
-    { id: 'new-folder', label: t.createFolderAction, icon: <FolderPlus size={16} /> }
+    { id: 'new-folder', label: t.createFolderAction, icon: <FolderPlus size={16} /> },
+    { id: 'export-data', label: t.exportData, icon: <Download size={16} /> },
+    { id: 'import-data', label: t.importData, icon: <Upload size={16} /> }
   ].filter(a => a.label.toLowerCase().includes(search.toLowerCase()));
 
   const totalItems = filteredPrompts.length + actions.length;
+
+  const handleExport = async () => {
+    const allPrompts = await db.prompts.toArray();
+    const allFolders = await db.folders.toArray();
+    const data = { prompts: allPrompts, folders: allFolders, version: 1 };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `promptgrid-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      try {
+        const data = JSON.parse(text);
+        if (data.prompts && data.folders) {
+          await db.transaction('rw', db.prompts, db.folders, async () => {
+            await db.prompts.clear();
+            await db.folders.clear();
+            await db.prompts.bulkAdd(data.prompts);
+            await db.folders.bulkAdd(data.folders);
+          });
+          alert(t.importSuccess);
+        }
+      } catch (err) {
+        alert('Invalid backup file.');
+      }
+    };
+    input.click();
+  };
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -70,15 +112,12 @@ export default function CommandPalette() {
       } else if (action.id === 'new-folder') {
         // Just create a default folder for now
         await createFolder('New Folder');
-      } else if (action.id === 'toggle-theme') {
-        setTheme(isDark ? 'light' : 'dark');
-        // keep open for effect, or close
-      } else if (action.id === 'toggle-lang') {
-        setLanguage(language === 'zh' ? 'en' : 'zh');
+      } else if (action.id === 'export-data') {
+        await handleExport();
+      } else if (action.id === 'import-data') {
+        handleImport();
       }
-      if (action.id !== 'toggle-theme' && action.id !== 'toggle-lang') {
-        setCommandPaletteOpen(false);
-      }
+      setCommandPaletteOpen(false);
     }
   };
 
@@ -111,7 +150,10 @@ export default function CommandPalette() {
       
       <div className="relative w-full max-w-xl bg-panel border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
         {/* Search Input */}
-        <div className="flex items-center px-4 py-4 border-b border-border gap-3">
+        <div 
+          className="flex items-center px-4 py-4 border-b border-border gap-3 cursor-text"
+          onClick={() => inputRef.current?.focus()}
+        >
           <Search size={20} className="text-gray-400 shrink-0" />
           <input
             ref={inputRef}
@@ -122,9 +164,9 @@ export default function CommandPalette() {
               setSelectedIndex(0);
             }}
             placeholder={t.searchPlaceholder}
-            className="flex-1 bg-transparent border-none outline-none text-gray-200 placeholder:text-gray-500 text-lg"
+            className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-gray-500 text-lg w-full"
           />
-          <div className="text-[10px] font-mono bg-background px-1.5 py-0.5 rounded text-gray-500 border border-border">ESC</div>
+          <div className="text-[10px] font-mono bg-background px-1.5 py-0.5 rounded text-gray-500 border border-border cursor-default">ESC</div>
         </div>
 
         {/* Results list */}
