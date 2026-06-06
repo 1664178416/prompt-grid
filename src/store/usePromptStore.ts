@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { db, Prompt, Folder } from '@/lib/db';
+import { generateId } from '@/lib/utils';
 
 
 interface PromptState {
@@ -18,11 +19,11 @@ interface PromptState {
   setCommandPaletteOpen: (isOpen: boolean) => void;
 
   // DB Operations (Wrapped for UI convenience)
-  createPrompt: (folderId?: string) => Promise<string>;
+  createPrompt: (folderId?: string | null) => Promise<string>;
   updatePrompt: (id: string, data: Partial<Prompt>) => Promise<void>;
   deletePrompt: (id: string) => Promise<void>;
   
-  createFolder: (name: string, parentId?: string) => Promise<string>;
+  createFolder: (name: string, parentId?: string | null) => Promise<string>;
   deleteFolder: (id: string) => Promise<void>;
 }
 
@@ -39,9 +40,9 @@ export const usePromptStore = create<PromptState>((set, get) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
   setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
 
-  createPrompt: async (folderId = null) => {
+  createPrompt: async (folderId: string | null = null) => {
     const newPrompt: Prompt = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       title: 'Untitled Prompt',
       content: '',
       folderId,
@@ -68,9 +69,9 @@ export const usePromptStore = create<PromptState>((set, get) => ({
     }
   },
 
-  createFolder: async (name, parentId = null) => {
+  createFolder: async (name: string, parentId: string | null = null) => {
     const newFolder: Folder = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name,
       parentId,
       createdAt: Date.now(),

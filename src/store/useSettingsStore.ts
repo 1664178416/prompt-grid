@@ -5,14 +5,26 @@ export type Language = 'en' | 'zh';
 
 interface SettingsState {
   language: Language;
+  apiKey: string;
+  apiBaseUrl: string;
+  defaultModel: string;
   setLanguage: (lang: Language) => void;
+  setApiKey: (key: string) => void;
+  setApiBaseUrl: (url: string) => void;
+  setDefaultModel: (model: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       language: 'zh', // 默认中文
+      apiKey: '',
+      apiBaseUrl: 'https://api.openai.com/v1',
+      defaultModel: 'gpt-3.5-turbo',
       setLanguage: (language) => set({ language }),
+      setApiKey: (apiKey) => set({ apiKey }),
+      setApiBaseUrl: (apiBaseUrl) => set({ apiBaseUrl }),
+      setDefaultModel: (defaultModel) => set({ defaultModel }),
     }),
     { name: 'prompt-grid-settings' }
   )
@@ -36,6 +48,7 @@ export const i18n = {
     variables: 'Variables',
     noVariables: 'No variables detected. Use {{name}} syntax.',
     runTest: 'Run Test',
+    unconfigured: '(Not Configured)',
     copyPrompt: 'Copy Filled Prompt',
     newFolder: 'New folder...',
     settings: 'Settings',
@@ -55,12 +68,32 @@ export const i18n = {
     // Phase 2
     tags: 'Tags',
     allTags: 'All Tags',
+    addTagPlaceholder: 'Add tag and press Enter...',
     moveFolder: 'Move to Folder...',
     exportData: 'Export All Data',
     importData: 'Import Data',
     exportSuccess: 'Data exported successfully!',
     importSuccess: 'Data imported successfully!',
     noFolder: 'No Folder',
+    // API Settings
+    apiConfig: 'API Configuration',
+    apiKey: 'API Key',
+    apiBaseUrl: 'Base URL',
+    defaultModel: 'Default Model',
+    saveSettings: 'Save Settings',
+    testResult: 'Test Result',
+    testing: 'Testing...',
+    testError: 'Test Error',
+    modelOverride: 'Override Model',
+    temperature: 'Temperature',
+    // Phase 4
+    systemInstructions: 'System Instructions',
+    systemInstructionsPlaceholder: 'Enter system instructions here (e.g. "You are an expert assistant...")',
+    saveTestCase: 'Save',
+    loadTestCase: '-- Load Test Case --',
+    copyText: 'Text',
+    copyJson: 'JSON',
+    copied: 'Copied!',
   },
   zh: {
     allPrompts: '所有提示词',
@@ -78,7 +111,8 @@ export const i18n = {
     playground: '测试沙盒',
     variables: '动态变量',
     noVariables: '未检测到变量。请使用 {{name}} 语法。',
-    runTest: '测试运行 (未配置 API)',
+    runTest: '测试运行',
+    unconfigured: '(未配置 API)',
     copyPrompt: '一键复制最终结果',
     newFolder: '新建文件夹...',
     settings: '偏好设置',
@@ -98,11 +132,31 @@ export const i18n = {
     // Phase 2
     tags: '标签',
     allTags: '全部标签',
+    addTagPlaceholder: '输入标签后按回车添加...',
     moveFolder: '移动到文件夹...',
     exportData: '导出备份数据',
     importData: '导入备份数据',
     exportSuccess: '数据导出成功！',
     importSuccess: '数据导入成功！',
     noFolder: '未分类',
+    // API Settings
+    apiConfig: 'API 接口配置',
+    apiKey: 'API 密钥 (API Key)',
+    apiBaseUrl: '接口地址 (Base URL)',
+    defaultModel: '默认模型',
+    saveSettings: '保存设置',
+    testResult: '测试结果',
+    testing: '正在请求...',
+    testError: '测试发生错误',
+    modelOverride: '模型配置',
+    temperature: '随机性 (Temperature)',
+    // Phase 4
+    systemInstructions: '系统提示词 (System Instructions)',
+    systemInstructionsPlaceholder: '在此输入系统设定（如："你是一个人工智能助手..."）',
+    saveTestCase: '保存用例',
+    loadTestCase: '-- 载入测试用例 --',
+    copyText: '纯文本',
+    copyJson: 'JSON',
+    copied: '已复制！',
   }
 };

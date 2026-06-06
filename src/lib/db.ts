@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie';
+import { generateId } from './utils';
 
 export interface Folder {
   id: string;
@@ -10,6 +11,7 @@ export interface Folder {
 export interface Prompt {
   id: string;
   title: string;
+  systemPrompt?: string;
   content: string;
   folderId: string | null;
   tags: string[];
@@ -19,6 +21,11 @@ export interface Prompt {
     modelName: string;
     temperature: number;
   };
+  testCases?: {
+    id: string;
+    name: string;
+    values: Record<string, string>;
+  }[];
   createdAt: number;
   updatedAt: number;
 }
@@ -35,7 +42,7 @@ export class PromptGridDatabase extends Dexie {
     });
     
     this.on('populate', async () => {
-      const demoFolderId = crypto.randomUUID();
+      const demoFolderId = generateId();
       await this.folders.add({
         id: demoFolderId,
         name: 'Getting Started',
@@ -44,7 +51,7 @@ export class PromptGridDatabase extends Dexie {
       });
       
       await this.prompts.add({
-        id: crypto.randomUUID(),
+        id: generateId(),
         title: '🚀 Welcome to PromptGrid',
         content: `Hello there! Welcome to PromptGrid, your premium prompt management tool.
 

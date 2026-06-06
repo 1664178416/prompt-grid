@@ -10,6 +10,13 @@ const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 export const metadata: Metadata = {
   title: "PromptGrid",
   description: "A functional, minimalist prompt manager.",
+  manifest: "/manifest.json",
+  themeColor: "#09090b",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "PromptGrid",
+  },
 };
 
 export default function RootLayout({
@@ -24,6 +31,17 @@ export default function RootLayout({
           {children}
           <CommandPalette />
         </ThemeProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js');
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

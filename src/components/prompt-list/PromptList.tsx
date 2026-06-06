@@ -75,6 +75,36 @@ export default function PromptList() {
     setActivePrompt(id);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === 'INPUT' || 
+        document.activeElement?.tagName === 'TEXTAREA' || 
+        document.activeElement?.tagName === 'SELECT' ||
+        (document.activeElement as HTMLElement)?.isContentEditable
+      ) {
+        return;
+      }
+      
+      if (!prompts.length) return;
+      
+      const currentIndex = prompts.findIndex(p => p.id === activePromptId);
+      
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const nextIndex = currentIndex < prompts.length - 1 ? currentIndex + 1 : 0;
+        setActivePrompt(prompts[nextIndex].id);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : prompts.length - 1;
+        setActivePrompt(prompts[prevIndex].id);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [prompts, activePromptId, setActivePrompt]);
+
   return (
     <div className="w-full h-full bg-background border-r border-border flex flex-col shrink-0">
       <div className="h-14 flex items-center px-4 border-b border-border justify-between">
@@ -128,7 +158,7 @@ export default function PromptList() {
 function PromptCard({ prompt, isActive, onClick, onDelete }: { prompt: Prompt, isActive: boolean, onClick: () => void, onDelete: (e: any) => void }) {
   const { language } = useSettingsStore();
   const t = i18n[language];
-  const estimatedTokens = Math.ceil((prompt.content.split(/\s+/).filter(Boolean).length || 0) * 1.3);
+  const estimatedTokens = Math.ceil(((prompt.content || '').split(/\s+/).filter(Boolean).length || 0) * 1.3);
   
   return (
     <div

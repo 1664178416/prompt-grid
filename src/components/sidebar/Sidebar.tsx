@@ -4,20 +4,24 @@ import { usePromptStore } from '@/store/usePromptStore';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { FolderPlus, Inbox, Star, Layers, Folder, Search } from 'lucide-react';
+import { FolderPlus, Inbox, Star, Layers, Folder, Search, Settings, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { usePwaInstall } from '@/hooks/usePwaInstall';
+import SettingsModal from './SettingsModal';
 
 export default function Sidebar() {
   const { activeFolderId, setActiveFolder, createFolder } = usePromptStore();
   const { language } = useSettingsStore();
   const t = i18n[language];
+  const { isInstallable, install } = usePwaInstall();
   
   const folders = useLiveQuery(() => db.folders.toArray()) || [];
   const prompts = useLiveQuery(() => db.prompts.toArray()) || [];
   
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleCreateFolder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +116,7 @@ export default function Sidebar() {
       </div>
 
       {/* Footer Area */}
-      <div className="p-4 border-t border-border mt-auto bg-panel/50">
+      <div className="p-4 border-t border-border mt-auto bg-panel/50 space-y-2">
         <button 
           onClick={() => usePromptStore.getState().setCommandPaletteOpen(true)}
           className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg bg-background border border-border shadow-sm text-sm text-gray-400 hover:text-foreground hover:border-indigo-500/50 hover:shadow-indigo-500/10 transition-all group"
@@ -124,7 +128,29 @@ export default function Sidebar() {
             <span className="text-[10px] font-mono bg-panel px-1.5 py-0.5 rounded text-gray-500 border border-border group-hover:border-gray-400 transition-colors">K</span>
           </div>
         </button>
+
+        <button 
+          onClick={() => setIsSettingsOpen(true)}
+          className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-500 hover:text-foreground hover:bg-panel-hover rounded-md transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Settings size={16} />
+            <span>{t.settings}</span>
+          </div>
+        </button>
+
+        {isInstallable && (
+          <button 
+            onClick={install}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-2 text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 rounded-md transition-colors shadow-sm"
+          >
+            <Download size={16} />
+            <span>Install Desktop App</span>
+          </button>
+        )}
       </div>
+
+      {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} />}
     </div>
   );
 }
