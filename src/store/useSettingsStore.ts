@@ -94,6 +94,11 @@ export const i18n = {
     copyText: 'Text',
     copyJson: 'JSON',
     copied: 'Copied!',
+    optimizePrompt: '✨ Optimize',
+    optimizing: 'Optimizing...',
+    applyOptimization: 'Apply to Editor',
+    optimizationTitle: 'AI Prompt Optimizer',
+    optimizationDesc: 'Let the AI rewrite your prompt using expert prompt engineering best practices.',
   },
   zh: {
     allPrompts: '所有提示词',
@@ -158,5 +163,10 @@ export const i18n = {
     copyText: '纯文本',
     copyJson: 'JSON',
     copied: '已复制！',
+    optimizePrompt: '✨ AI 优化',
+    optimizing: '正在施展魔法...',
+    applyOptimization: '应用到编辑器',
+    optimizationTitle: 'AI 提示词优化引擎',
+    optimizationDesc: '让大模型利用专业的提示词工程最佳实践，自动为您重写、扩充、优化这组提示词。',
   }
 };

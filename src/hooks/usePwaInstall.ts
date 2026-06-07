@@ -23,10 +23,19 @@ export function usePwaInstall() {
       setIsInstalled(true);
     }
 
+    const checkGlobalPrompt = () => {
+      const w = window as any;
+      if (w.deferredPwaPrompt) {
+        setDeferredPrompt(w.deferredPwaPrompt);
+        setIsInstallable(true);
+      }
+    };
+
+    // Check if the event already fired before React hydrated
+    checkGlobalPrompt();
+
     const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent the mini-infobar from appearing on mobile
       e.preventDefault();
-      // Stash the event so it can be triggered later
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setIsInstallable(true);
     };
@@ -37,10 +46,12 @@ export function usePwaInstall() {
       setDeferredPrompt(null);
     };
 
+    window.addEventListener('pwa-prompt-ready', checkGlobalPrompt);
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      window.removeEventListener('pwa-prompt-ready', checkGlobalPrompt);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
