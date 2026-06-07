@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useTheme } from 'next-themes';
-import { X, Moon, Sun, Settings as SettingsIcon } from 'lucide-react';
+import { X, Moon, Sun, Settings as SettingsIcon, Download, Upload } from 'lucide-react';
+import { db } from '@/lib/db';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -31,6 +32,50 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     setApiBaseUrl(localApiBaseUrl);
     setDefaultModel(localDefaultModel);
     onClose();
+  };
+
+  const handleExport = async () => {
+    try {
+      const folders = await db.folders.toArray();
+      const prompts = await db.prompts.toArray();
+      const backupData = JSON.stringify({ folders, prompts }, null, 2);
+      const blob = new Blob([backupData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `PromptGrid-Backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Export failed', e);
+    }
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.folders && data.prompts) {
+          await db.transaction('rw', db.folders, db.prompts, async () => {
+            // Bulk put overrides items with same IDs, keeping existing ones
+            if (data.folders.length > 0) await db.folders.bulkPut(data.folders);
+            if (data.prompts.length > 0) await db.prompts.bulkPut(data.prompts);
+          });
+          alert(t.importSuccess);
+        } else {
+          alert(t.importError);
+        }
+      } catch (err) {
+        alert(t.importError);
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    e.target.value = '';
   };
 
   return (
@@ -87,6 +132,33 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 <option value="zh">中文</option>
                 <option value="en">English</option>
               </select>
+            </div>
+          </div>
+
+          <hr className="border-border" />
+
+          {/* Data Management */}
+          <div>
+            <h3 className="text-sm font-semibold mb-4 text-indigo-500">{t.dataManagement || 'Data Management'}</h3>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleExport}
+                className="flex items-center justify-center gap-2 flex-1 bg-background border border-border hover:bg-panel text-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+              >
+                <Download size={16} className="text-indigo-400" />
+                {t.exportData || 'Export Backup'}
+              </button>
+              
+              <label className="flex items-center justify-center gap-2 flex-1 bg-background border border-border hover:bg-panel text-foreground px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer">
+                <Upload size={16} className="text-emerald-400" />
+                {t.importData || 'Import Backup'}
+                <input 
+                  type="file" 
+                  accept=".json" 
+                  onChange={handleImport}
+                  className="hidden" 
+                />
+              </label>
             </div>
           </div>
 

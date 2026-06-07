@@ -8,6 +8,7 @@ import { FolderPlus, Inbox, Star, Layers, Folder, Search, Settings, Download } f
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
+import { useEnvironment } from '@/hooks/useEnvironment';
 import SettingsModal from './SettingsModal';
 
 export default function Sidebar() {
@@ -15,6 +16,7 @@ export default function Sidebar() {
   const { language } = useSettingsStore();
   const t = i18n[language];
   const { isInstallable, install } = usePwaInstall();
+  const { isWeb } = useEnvironment();
   
   const folders = useLiveQuery(() => db.folders.toArray()) || [];
   const prompts = useLiveQuery(() => db.prompts.toArray()) || [];
@@ -139,14 +141,16 @@ export default function Sidebar() {
           </div>
         </button>
 
-        {isInstallable && (
-          <button 
-            onClick={install}
+        {isWeb && (
+          <a 
+            href="https://github.com/wyh/prompt-grid/releases/latest" 
+            target="_blank" 
+            rel="noreferrer"
             className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-2 text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 rounded-md transition-colors shadow-sm"
           >
             <Download size={16} />
-            <span>Install Desktop App</span>
-          </button>
+            <span>Download Desktop App</span>
+          </a>
         )}
       </div>
 

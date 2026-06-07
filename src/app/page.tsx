@@ -5,6 +5,9 @@ import PromptList from '@/components/prompt-list/PromptList';
 import Editor from '@/components/editor/Editor';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { usePromptStore } from '@/store/usePromptStore';
+import { useEnvironment } from '@/hooks/useEnvironment';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useRouter } from 'next/navigation';
 
 function GlobalShortcuts() {
   const { createPrompt, activeFolderId, setActivePrompt, deletePrompt, activePromptId } = usePromptStore();
@@ -33,9 +36,24 @@ function GlobalShortcuts() {
 export default function Home() {
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [listWidth, setListWidth] = useState(320);
+  const { isWeb } = useEnvironment();
+  const { isLoggedIn } = useAuthStore();
+  const router = useRouter();
+  
+  const [mounted, setMounted] = useState(false);
   
   const isResizingSidebar = useRef(false);
   const isResizingList = useRef(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && isWeb && !isLoggedIn) {
+      router.push('/login');
+    }
+  }, [mounted, isWeb, isLoggedIn, router]);
 
   const startResizingSidebar = useCallback(() => {
     isResizingSidebar.current = true;
@@ -78,6 +96,9 @@ export default function Home() {
       window.removeEventListener('mouseup', stopResizing);
     };
   }, [resize, stopResizing]);
+
+  if (!mounted) return null;
+  if (isWeb && !isLoggedIn) return null; // Avoid flicker before redirect
 
   return (
     <main className="flex h-screen w-full bg-background text-foreground overflow-hidden">

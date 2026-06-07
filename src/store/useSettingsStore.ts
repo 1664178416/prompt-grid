@@ -70,10 +70,7 @@ export const i18n = {
     allTags: 'All Tags',
     addTagPlaceholder: 'Add tag and press Enter...',
     moveFolder: 'Move to Folder...',
-    exportData: 'Export All Data',
-    importData: 'Import Data',
     exportSuccess: 'Data exported successfully!',
-    importSuccess: 'Data imported successfully!',
     noFolder: 'No Folder',
     // API Settings
     apiConfig: 'API Configuration',
@@ -99,6 +96,11 @@ export const i18n = {
     applyOptimization: 'Apply to Editor',
     optimizationTitle: 'AI Prompt Optimizer',
     optimizationDesc: 'Let the AI rewrite your prompt using expert prompt engineering best practices.',
+    dataManagement: 'Data Management',
+    exportData: 'Export Backup',
+    importData: 'Import Backup',
+    importSuccess: 'Data imported successfully!',
+    importError: 'Invalid backup file.',
   },
   zh: {
     allPrompts: '所有提示词',
@@ -139,10 +141,7 @@ export const i18n = {
     allTags: '全部标签',
     addTagPlaceholder: '输入标签后按回车添加...',
     moveFolder: '移动到文件夹...',
-    exportData: '导出备份数据',
-    importData: '导入备份数据',
     exportSuccess: '数据导出成功！',
-    importSuccess: '数据导入成功！',
     noFolder: '未分类',
     // API Settings
     apiConfig: 'API 接口配置',
@@ -168,5 +167,10 @@ export const i18n = {
     applyOptimization: '应用到编辑器',
     optimizationTitle: 'AI 提示词优化引擎',
     optimizationDesc: '让大模型利用专业的提示词工程最佳实践，自动为您重写、扩充、优化这组提示词。',
+    dataManagement: '数据管理',
+    exportData: '导出备份',
+    importData: '导入备份',
+    importSuccess: '数据导入成功！',
+    importError: '无效的备份文件。',
   }
 };
