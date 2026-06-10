@@ -6,7 +6,7 @@
   <p><strong>A functional, minimalist prompt manager for the AI era.</strong></p>
   <p>Local-First • Native Desktop • Beautiful UI • AI Optimizer</p>
 
-  [![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
+  [![Next.js](https://img.shields.io/badge/Next.js-16.2-black)](https://nextjs.org/)
   [![Electron](https://img.shields.io/badge/Electron-42-blue)](https://electronjs.org/)
   [![TailwindCSS](https://img.shields.io/badge/Tailwind-V4-38B2AC)](https://tailwindcss.com/)
   [![Zustand](https://img.shields.io/badge/Zustand-5-brown)](https://zustand-demo.pmnd.rs/)
@@ -69,7 +69,7 @@ npm run electron:build
 
 ## 🛠 Tech Stack
 
-- **Framework**: Next.js (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Desktop Wrapper**: Electron + Electron-Builder
 - **Styling**: Tailwind CSS V4
 - **State Management**: Zustand

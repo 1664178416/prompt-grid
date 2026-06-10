@@ -52,14 +52,13 @@ export class PromptGridDatabase extends Dexie {
       
       await this.prompts.add({
         id: generateId(),
-        title: '🚀 Welcome to PromptGrid',
-        content: `Hello there! Welcome to PromptGrid, your premium prompt management tool.
+        title: 'Welcome to PromptGrid',
+        content: `Welcome to PromptGrid, your local-first prompt workspace.
 
-Here is how you use dynamic variables:
-You can wrap any word in double curly braces, like this: {{topic}}.
-The right-side Playground will automatically extract it into an input field!
+Dynamic variables use double curly braces, like {{topic}} and {{tone}}.
+The Playground will extract them into reusable inputs automatically.
 
-Try changing the {{topic}} and the {{tone}} in the Playground, then hit "Copy Filled Prompt" at the bottom right.`,
+Try filling {{topic}} and {{tone}}, then use Text or JSON copy in the Playground.`,
         folderId: demoFolderId,
         tags: ['tutorial', 'demo'],
         isFavorite: true,

@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { X, Sparkles, Loader2, Check } from 'lucide-react';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import SimpleEditor from 'react-simple-code-editor';
+import { getErrorMessage } from '@/lib/utils';
+import { readChatCompletionStream, readChatError } from '@/lib/openai-stream';
 
 interface PromptOptimizerModalProps {
   isOpen: boolean;
@@ -27,46 +29,36 @@ export default function PromptOptimizerModal({
   const [resultText, setResultText] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   
-  const [parsedSystem, setParsedSystem] = useState('');
-  const [parsedUser, setParsedUser] = useState('');
-
   useEffect(() => {
     if (isOpen) {
-      setStatus('idle');
-      setResultText('');
-      setParsedSystem('');
-      setParsedUser('');
-      setErrorMsg('');
+      const timer = window.setTimeout(() => {
+        setStatus('idle');
+        setResultText('');
+        setErrorMsg('');
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [isOpen]);
 
-  // Parse the streaming result
-  useEffect(() => {
-    if (resultText) {
-      // Simple regex to extract sections
-      const sysMatch = resultText.match(/### SYSTEM PROMPT\n([\s\S]*?)(?:### USER PROMPT|$)/i);
-      const userMatch = resultText.match(/### USER PROMPT\n([\s\S]*)/i);
-      
-      if (sysMatch && sysMatch[1]) {
-        setParsedSystem(sysMatch[1].trim());
-      }
-      if (userMatch && userMatch[1]) {
-        setParsedUser(userMatch[1].trim());
-      }
-    }
+  const { parsedSystem, parsedUser } = useMemo(() => {
+    const sysMatch = resultText.match(/### SYSTEM PROMPT\n([\s\S]*?)(?:### USER PROMPT|$)/i);
+    const userMatch = resultText.match(/### USER PROMPT\n([\s\S]*)/i);
+
+    return {
+      parsedSystem: sysMatch?.[1]?.trim() || '',
+      parsedUser: userMatch?.[1]?.trim() || '',
+    };
   }, [resultText]);
 
   const handleOptimize = async () => {
     if (!apiKey) {
-      setErrorMsg('API Key is missing. Please configure it in settings.');
+      setErrorMsg(t.apiKeyMissing);
       setStatus('error');
       return;
     }
 
     setStatus('optimizing');
     setResultText('');
-    setParsedSystem('');
-    setParsedUser('');
     setErrorMsg('');
 
     const expertPrompt = `You are an elite AI Prompt Engineer. Your task is to rewrite the user's draft prompt to be extremely effective for LLMs.
@@ -111,41 +103,17 @@ ${currentContent}`;
       });
 
       if (!response.ok) {
-        let errStr = `API Error: ${response.status}`;
-        try {
-          const errBody = await response.json();
-          if (errBody.error?.message) errStr += `\n\n${errBody.error.message}`;
-          else if (errBody.message) errStr += `\n\n${errBody.message}`;
-        } catch(e) {}
-        throw new Error(errStr);
+        throw new Error(await readChatError(response));
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      
-      if (reader) {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n').filter(line => line.trim() !== '');
-          for (const line of lines) {
-            if (line.replace(/^data: /, '') === '[DONE]') break;
-            if (line.startsWith('data: ')) {
-              try {
-                const parsed = JSON.parse(line.replace(/^data: /, ''));
-                if (parsed.choices?.[0]?.delta?.content) {
-                  setResultText(prev => prev + parsed.choices[0].delta.content);
-                }
-              } catch (e) {}
-            }
-          }
-        }
-      }
+      await readChatCompletionStream({
+        response,
+        onContent: (text) => setResultText(prev => prev + text),
+      });
       setStatus('success');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus('error');
-      setErrorMsg(err.message || 'Unknown error');
+      setErrorMsg(getErrorMessage(err));
     }
   };
 
@@ -181,16 +149,16 @@ ${currentContent}`;
               <div className="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-400 mb-6">
                 <Sparkles size={32} />
               </div>
-              <h3 className="text-lg font-medium mb-2">Ready to Optimize</h3>
+              <h3 className="text-lg font-medium mb-2">{t.readyToOptimize}</h3>
               <p className="text-sm text-gray-500 max-w-sm mb-8">
-                We will send your current draft prompt to the LLM to rewrite it using advanced prompt engineering best practices.
+                {t.optimizationReadyDesc}
               </p>
               <button 
                 onClick={handleOptimize}
                 className="bg-indigo-500 hover:bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-indigo-500/20 flex items-center gap-2"
               >
                 <Sparkles size={16} />
-                Start Optimization
+                {t.startOptimization}
               </button>
             </div>
           ) : (
@@ -249,7 +217,7 @@ ${currentContent}`;
               )}
               {status === 'success' && (
                 <span className="text-sm text-emerald-400 flex items-center gap-1">
-                  <Check size={14} /> Optimization Complete
+                  <Check size={14} /> {t.optimizationComplete}
                 </span>
               )}
             </div>
@@ -259,7 +227,7 @@ ${currentContent}`;
                 onClick={onClose}
                 className="px-4 py-2 text-sm text-gray-400 hover:text-foreground transition-colors"
               >
-                Cancel
+                {t.cancel}
               </button>
               <button 
                 onClick={() => {

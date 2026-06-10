@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useSettingsStore, i18n } from '@/store/useSettingsStore';
+import { useSettingsStore, i18n, type Language } from '@/store/useSettingsStore';
 import { useTheme } from 'next-themes';
 import { X, Moon, Sun, Settings as SettingsIcon, Download, Upload } from 'lucide-react';
-import { db } from '@/lib/db';
+import { createBackupData, downloadJsonBackup, importBackupData, parseBackupData, type ImportMode } from '@/lib/backup';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -26,6 +26,8 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
   const [localApiKey, setLocalApiKey] = useState(apiKey);
   const [localApiBaseUrl, setLocalApiBaseUrl] = useState(apiBaseUrl);
   const [localDefaultModel, setLocalDefaultModel] = useState(defaultModel);
+  const [importMode, setImportMode] = useState<ImportMode>('merge');
+  const [dataMessage, setDataMessage] = useState('');
 
   const handleSave = () => {
     setApiKey(localApiKey);
@@ -36,18 +38,11 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
 
   const handleExport = async () => {
     try {
-      const folders = await db.folders.toArray();
-      const prompts = await db.prompts.toArray();
-      const backupData = JSON.stringify({ folders, prompts }, null, 2);
-      const blob = new Blob([backupData], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `PromptGrid-Backup-${new Date().toISOString().split('T')[0]}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('Export failed', e);
+      downloadJsonBackup(await createBackupData());
+      setDataMessage(t.exportSuccess);
+    } catch (err) {
+      console.error('Export failed', err);
+      setDataMessage(t.importError);
     }
   };
 
@@ -58,19 +53,15 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
-        const data = JSON.parse(event.target?.result as string);
-        if (data.folders && data.prompts) {
-          await db.transaction('rw', db.folders, db.prompts, async () => {
-            // Bulk put overrides items with same IDs, keeping existing ones
-            if (data.folders.length > 0) await db.folders.bulkPut(data.folders);
-            if (data.prompts.length > 0) await db.prompts.bulkPut(data.prompts);
-          });
-          alert(t.importSuccess);
-        } else {
-          alert(t.importError);
+        const data = parseBackupData(event.target?.result as string);
+        const confirmMessage = importMode === 'replace' ? t.confirmImportReplace : t.confirmImportMerge;
+        if (!window.confirm(confirmMessage)) {
+          return;
         }
-      } catch (err) {
-        alert(t.importError);
+        await importBackupData(data, importMode);
+        setDataMessage(t.importSuccess);
+      } catch {
+        setDataMessage(t.importError);
       }
     };
     reader.readAsText(file);
@@ -126,7 +117,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               <span className="text-sm font-medium">{t.language}</span>
               <select
                 value={language}
-                onChange={(e) => setLanguage(e.target.value as any)}
+                onChange={(e) => setLanguage(e.target.value as Language)}
                 className="bg-background border border-border rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500/50"
               >
                 <option value="zh">中文</option>
@@ -140,6 +131,24 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
           {/* Data Management */}
           <div>
             <h3 className="text-sm font-semibold mb-4 text-indigo-500">{t.dataManagement || 'Data Management'}</h3>
+            <div className="mb-4 space-y-2">
+              <span className="block text-xs font-medium text-gray-500">{t.importMode}</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setImportMode('merge')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${importMode === 'merge' ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-500' : 'border-border bg-background text-gray-500 hover:text-foreground'}`}
+                >
+                  {t.importMerge}
+                </button>
+                <button
+                  onClick={() => setImportMode('replace')}
+                  className={`rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${importMode === 'replace' ? 'border-red-500/40 bg-red-500/10 text-red-400' : 'border-border bg-background text-gray-500 hover:text-foreground'}`}
+                >
+                  {t.importReplace}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed">{t.importMergeHint}</p>
+            </div>
             <div className="flex items-center gap-3">
               <button 
                 onClick={handleExport}
@@ -160,6 +169,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 />
               </label>
             </div>
+            {dataMessage && <p className="mt-3 text-xs text-gray-500">{dataMessage}</p>}
           </div>
 
           <hr className="border-border" />

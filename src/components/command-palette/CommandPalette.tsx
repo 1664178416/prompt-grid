@@ -1,55 +1,47 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { usePromptStore } from '@/store/usePromptStore';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { Search, FileText, FolderPlus, Plus, Download, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useTheme } from 'next-themes';
+import { createBackupData, downloadJsonBackup, importBackupData, parseBackupData } from '@/lib/backup';
 
 export default function CommandPalette() {
   const { isCommandPaletteOpen, setCommandPaletteOpen, setActivePrompt, createPrompt, createFolder } = usePromptStore();
-  const { language, setLanguage } = useSettingsStore();
+  const { language } = useSettingsStore();
   const t = i18n[language];
-  const { theme, setTheme, systemTheme } = useTheme();
 
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const prompts = useLiveQuery(() => db.prompts.toArray()) || [];
+  const allPrompts = useLiveQuery(() => db.prompts.toArray());
   
-  const filteredPrompts = prompts.filter(p => 
-    p.title.toLowerCase().includes(search.toLowerCase()) || 
-    p.content.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredPrompts = useMemo(() => {
+    const q = search.toLowerCase();
+    return (allPrompts || []).filter(p => 
+      p.title.toLowerCase().includes(q) || 
+      p.content.toLowerCase().includes(q)
+    );
+  }, [allPrompts, search]);
 
-  const actions = [
+  const actions = useMemo(() => [
     { id: 'new-prompt', label: t.createPromptAction, icon: <Plus size={16} /> },
     { id: 'new-folder', label: t.createFolderAction, icon: <FolderPlus size={16} /> },
     { id: 'export-data', label: t.exportData, icon: <Download size={16} /> },
     { id: 'import-data', label: t.importData, icon: <Upload size={16} /> }
-  ].filter(a => a.label.toLowerCase().includes(search.toLowerCase()));
+  ].filter(a => a.label.toLowerCase().includes(search.toLowerCase())), [search, t.createPromptAction, t.createFolderAction, t.exportData, t.importData]);
 
   const totalItems = filteredPrompts.length + actions.length;
 
-  const handleExport = async () => {
-    const allPrompts = await db.prompts.toArray();
-    const allFolders = await db.folders.toArray();
-    const data = { prompts: allPrompts, folders: allFolders, version: 1 };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `promptgrid-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const handleExport = useCallback(async () => {
+    downloadJsonBackup(await createBackupData());
+  }, []);
 
-  const handleImport = () => {
+  const handleImport = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/json';
@@ -58,22 +50,17 @@ export default function CommandPalette() {
       if (!file) return;
       const text = await file.text();
       try {
-        const data = JSON.parse(text);
-        if (data.prompts && data.folders) {
-          await db.transaction('rw', db.prompts, db.folders, async () => {
-            await db.prompts.clear();
-            await db.folders.clear();
-            await db.prompts.bulkAdd(data.prompts);
-            await db.folders.bulkAdd(data.folders);
-          });
-          alert(t.importSuccess);
+        const data = parseBackupData(text);
+        if (window.confirm(t.confirmImportMerge)) {
+          await importBackupData(data, 'merge');
+          window.alert(t.importSuccess);
         }
-      } catch (err) {
-        alert('Invalid backup file.');
+      } catch {
+        window.alert(t.importError);
       }
     };
     input.click();
-  };
+  }, [t.confirmImportMerge, t.importError, t.importSuccess]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -91,13 +78,16 @@ export default function CommandPalette() {
 
   useEffect(() => {
     if (isCommandPaletteOpen) {
-      setSearch('');
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const timer = window.setTimeout(() => {
+        setSearch('');
+        setSelectedIndex(0);
+        inputRef.current?.focus();
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [isCommandPaletteOpen]);
 
-  const executeAction = async (index: number) => {
+  const executeAction = useCallback(async (index: number) => {
     if (index < filteredPrompts.length) {
       // It's a prompt
       setActivePrompt(filteredPrompts[index].id!);
@@ -119,7 +109,7 @@ export default function CommandPalette() {
       }
       setCommandPaletteOpen(false);
     }
-  };
+  }, [actions, createFolder, createPrompt, filteredPrompts, handleExport, handleImport, setActivePrompt, setCommandPaletteOpen]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -139,7 +129,7 @@ export default function CommandPalette() {
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [isCommandPaletteOpen, totalItems, selectedIndex, filteredPrompts, actions]); // Note: execution depends on exact snapshot
+  }, [executeAction, isCommandPaletteOpen, selectedIndex, totalItems]);
 
   if (!isCommandPaletteOpen) return null;
 

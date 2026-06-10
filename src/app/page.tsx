@@ -8,9 +8,13 @@ import { usePromptStore } from '@/store/usePromptStore';
 import { useEnvironment } from '@/hooks/useEnvironment';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
+import { useHydrated } from '@/hooks/useHydrated';
+import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 
 function GlobalShortcuts() {
   const { createPrompt, activeFolderId, setActivePrompt, deletePrompt, activePromptId } = usePromptStore();
+  const { language } = useSettingsStore();
+  const t = i18n[language];
 
   useEffect(() => {
     const down = async (e: KeyboardEvent) => {
@@ -22,13 +26,15 @@ function GlobalShortcuts() {
       if (e.key === 'Backspace' && (e.metaKey || e.ctrlKey)) {
         if (activePromptId) {
           e.preventDefault();
-          deletePrompt(activePromptId);
+          if (window.confirm(t.confirmDeletePrompt)) {
+            deletePrompt(activePromptId);
+          }
         }
       }
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [activeFolderId, activePromptId, createPrompt, setActivePrompt, deletePrompt]);
+  }, [activeFolderId, activePromptId, createPrompt, setActivePrompt, deletePrompt, t.confirmDeletePrompt]);
 
   return null;
 }
@@ -39,15 +45,10 @@ export default function Home() {
   const { isWeb } = useEnvironment();
   const { isLoggedIn } = useAuthStore();
   const router = useRouter();
-  
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHydrated();
   
   const isResizingSidebar = useRef(false);
   const isResizingList = useRef(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (mounted && isWeb && !isLoggedIn) {

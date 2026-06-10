@@ -11,3 +11,11 @@ export function generateId() {
   }
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
+
+export function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function getErrorMessage(error: unknown, fallback = 'Unknown error') {
+  return error instanceof Error ? error.message : fallback;
+}

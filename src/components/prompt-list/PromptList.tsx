@@ -6,14 +6,15 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Prompt } from '@/lib/db';
 import { cn } from '@/lib/utils';
 import { Plus, Sun, Moon, Star, Trash2 } from 'lucide-react';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useTheme } from 'next-themes';
+import { useHydrated } from '@/hooks/useHydrated';
 
 function ThemeToggle() {
   const { theme, setTheme, systemTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const { language } = useSettingsStore();
+  const t = i18n[language];
+  const mounted = useHydrated();
 
   if (!mounted) return <div className="w-7 h-7" />;
 
@@ -23,7 +24,7 @@ function ThemeToggle() {
     <button
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
       className="w-7 h-7 rounded flex items-center justify-center text-gray-400 hover:text-foreground hover:bg-panel-hover transition-colors"
-      title="Toggle theme"
+      title={t.toggleTheme}
     >
       {isDark ? <Moon size={14} /> : <Sun size={14} />}
     </button>
@@ -32,12 +33,13 @@ function ThemeToggle() {
 
 function LangToggle() {
   const { language, setLanguage } = useSettingsStore();
+  const t = i18n[language];
   
   return (
     <button
       onClick={() => setLanguage(language === 'zh' ? 'en' : 'zh')}
       className="w-7 h-7 rounded flex items-center justify-center text-gray-400 hover:text-foreground hover:bg-panel-hover transition-colors font-semibold text-[10px]"
-      title="Toggle Language"
+      title={t.toggleLanguage}
     >
       {language === 'zh' ? 'EN' : '中'}
     </button>
@@ -45,11 +47,12 @@ function LangToggle() {
 }
 
 export default function PromptList() {
-  const { activeFolderId, activeTag, activePromptId, setActivePrompt, createPrompt, deletePrompt, searchQuery, setSearchQuery } = usePromptStore();
+  const { activeFolderId, activeTag, activePromptId, setActivePrompt, createPrompt, updatePrompt, deletePrompt, searchQuery, setSearchQuery } = usePromptStore();
   const { language } = useSettingsStore();
   const t = i18n[language];
   
-  const allPrompts = useLiveQuery(() => db.prompts.toArray()) || [];
+  const livePrompts = useLiveQuery(() => db.prompts.toArray());
+  const allPrompts = useMemo(() => livePrompts || [], [livePrompts]);
   
   const prompts = useMemo(() => {
     let filtered = allPrompts;
@@ -145,7 +148,13 @@ export default function PromptList() {
               onClick={() => setActivePrompt(prompt.id)}
               onDelete={(e) => {
                 e.stopPropagation();
-                deletePrompt(prompt.id);
+                if (window.confirm(t.confirmDeletePrompt)) {
+                  deletePrompt(prompt.id);
+                }
+              }}
+              onToggleFavorite={(e) => {
+                e.stopPropagation();
+                updatePrompt(prompt.id, { isFavorite: !prompt.isFavorite });
               }}
             />
           ))
@@ -155,7 +164,7 @@ export default function PromptList() {
   );
 }
 
-function PromptCard({ prompt, isActive, onClick, onDelete }: { prompt: Prompt, isActive: boolean, onClick: () => void, onDelete: (e: any) => void }) {
+function PromptCard({ prompt, isActive, onClick, onDelete, onToggleFavorite }: { prompt: Prompt, isActive: boolean, onClick: () => void, onDelete: (e: React.MouseEvent<HTMLButtonElement>) => void, onToggleFavorite: (e: React.MouseEvent<HTMLButtonElement>) => void }) {
   const { language } = useSettingsStore();
   const t = i18n[language];
   const estimatedTokens = Math.ceil(((prompt.content || '').split(/\s+/).filter(Boolean).length || 0) * 1.3);
@@ -176,10 +185,7 @@ function PromptCard({ prompt, isActive, onClick, onDelete }: { prompt: Prompt, i
         </h3>
         <div className={cn("flex items-center gap-1 transition-opacity", prompt.isFavorite ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
           <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              usePromptStore.getState().updatePrompt(prompt.id, { isFavorite: !prompt.isFavorite });
-            }}
+            onClick={onToggleFavorite}
             className="text-gray-400 hover:text-amber-400 transition-colors p-1"
           >
             <Star size={12} className={prompt.isFavorite ? "fill-amber-400 text-amber-400" : ""} />

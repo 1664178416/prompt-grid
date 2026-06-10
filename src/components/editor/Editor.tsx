@@ -3,10 +3,11 @@
 import { usePromptStore } from '@/store/usePromptStore';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/lib/db';
-import { useEffect, useState, useRef } from 'react';
+import { db, type Prompt } from '@/lib/db';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Play, Copy, Star, Trash2, Folder, ChevronDown, Check, Loader2, Settings2, Save, FileJson, Sparkles } from 'lucide-react';
-import { cn, generateId } from '@/lib/utils';
+import { cn, escapeRegExp, generateId, getErrorMessage } from '@/lib/utils';
+import { readChatCompletionStream, readChatError, type ChatUsage } from '@/lib/openai-stream';
 import SimpleEditor from 'react-simple-code-editor';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,7 +18,20 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import PromptOptimizerModal from './PromptOptimizerModal';
 
-const CodeBlock = ({ node, inline, className, children, ...props }: any) => {
+function extractPromptVariables(text: string) {
+  if (!text) return [];
+  const regex = /\{\{([^}]+)\}\}/g;
+  const matches = Array.from(text.matchAll(regex)).map(m => m[1].trim());
+  return Array.from(new Set(matches));
+}
+
+interface CodeBlockProps {
+  inline?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}
+
+const CodeBlock = ({ inline, className, children, ...props }: CodeBlockProps) => {
   const match = /language-(\w+)/.exec(className || '');
   const lang = match ? match[1] : '';
   const code = String(children).replace(/\n$/, '');
@@ -48,7 +62,7 @@ const CodeBlock = ({ node, inline, className, children, ...props }: any) => {
           </button>
         </div>
         <SyntaxHighlighter
-          style={vscDarkPlus as any}
+          style={vscDarkPlus}
           language={lang}
           PreTag="div"
           customStyle={{ margin: 0, padding: '1rem', background: '#1e1e1e', fontSize: '0.85rem' }}
@@ -95,37 +109,89 @@ export default function Editor() {
   // API Test state
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testResult, setTestResult] = useState('');
-  const [testUsage, setTestUsage] = useState<any>(null);
+  const [testUsage, setTestUsage] = useState<ChatUsage | null>(null);
   const [testDuration, setTestDuration] = useState<number | null>(null);
   const [isModelConfigOpen, setIsModelConfigOpen] = useState(false);
   const [activeTestCaseId, setActiveTestCaseId] = useState<string | null>(null);
   const [isOptimizerOpen, setIsOptimizerOpen] = useState(false);
+  const [isSavingTestCase, setIsSavingTestCase] = useState(false);
+  const [testCaseName, setTestCaseName] = useState('');
+  const pendingPromptUpdate = useRef<{ id: string; data: Partial<Prompt> } | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncedPromptId = useRef<string | null>(null);
   
   const folders = useLiveQuery(() => db.folders.toArray()) || [];
 
+  const flushPendingPromptUpdate = useCallback(() => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+
+    if (pendingPromptUpdate.current) {
+      const { id, data } = pendingPromptUpdate.current;
+      pendingPromptUpdate.current = null;
+      updatePrompt(id, data);
+    }
+  }, [updatePrompt]);
+
+  const queuePromptUpdate = useCallback((data: Partial<Prompt>) => {
+    if (!activePromptId) return;
+
+    pendingPromptUpdate.current = {
+      id: activePromptId,
+      data: {
+        ...(pendingPromptUpdate.current?.id === activePromptId ? pendingPromptUpdate.current.data : {}),
+        ...data,
+      },
+    };
+
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(flushPendingPromptUpdate, 450);
+  }, [activePromptId, flushPendingPromptUpdate]);
+
   // Sync state when active prompt changes
   useEffect(() => {
-    if (prompt) {
-      setTitle(prompt.title || '');
-      setSystemPrompt(prompt.systemPrompt || '');
-      setContent(prompt.content || '');
-      extractVariables(prompt.content || '');
-      setTagInput('');
-      setTestStatus('idle');
-      setTestResult('');
-    } else {
-      setTitle('');
-      setSystemPrompt('');
-      setContent('');
-      setVariables([]);
-      setTestStatus('idle');
-      setTestResult('');
-      setTestUsage(null);
-      setTestDuration(null);
-      setFilledVars({});
-      setActiveTestCaseId(null);
-    }
-  }, [prompt?.id]);
+    flushPendingPromptUpdate();
+    const nextPromptId = prompt?.id ?? null;
+    if (syncedPromptId.current === nextPromptId) return;
+    syncedPromptId.current = nextPromptId;
+
+    const timer = window.setTimeout(() => {
+      if (prompt) {
+        setTitle(prompt.title || '');
+        setSystemPrompt(prompt.systemPrompt || '');
+        setContent(prompt.content || '');
+        setVariables(extractPromptVariables(prompt.content || ''));
+        setTagInput('');
+        setTestStatus('idle');
+        setTestResult('');
+        setTestUsage(null);
+        setTestDuration(null);
+        setIsSavingTestCase(false);
+        setTestCaseName('');
+      } else {
+        setTitle('');
+        setSystemPrompt('');
+        setContent('');
+        setVariables([]);
+        setTestStatus('idle');
+        setTestResult('');
+        setTestUsage(null);
+        setTestDuration(null);
+        setFilledVars({});
+        setActiveTestCaseId(null);
+        setIsSavingTestCase(false);
+        setTestCaseName('');
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [flushPendingPromptUpdate, prompt]);
+
+  useEffect(() => {
+    return () => flushPendingPromptUpdate();
+  }, [flushPendingPromptUpdate]);
 
   const addTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && tagInput.trim()) {
@@ -144,17 +210,6 @@ export default function Editor() {
     updatePrompt(activePromptId!, { tags: currentTags.filter(t => t !== tagToRemove) });
   };
 
-  const extractVariables = (text: string) => {
-    if (!text) {
-      setVariables([]);
-      return;
-    }
-    const regex = /\{\{([^}]+)\}\}/g;
-    const matches = Array.from(text.matchAll(regex)).map(m => m[1].trim());
-    const uniqueVars = Array.from(new Set(matches));
-    setVariables(uniqueVars);
-  };
-
   const highlightVariables = (code: string) => {
     if (!code) return '';
     return code
@@ -164,29 +219,30 @@ export default function Editor() {
       .replace(/\{\{([^}]+)\}\}/g, '<span class="text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-500/10 px-0.5 rounded">{{$1}}</span>');
   };
 
-  const handleSystemPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setSystemPrompt(val);
-    if (activePromptId) {
-      updatePrompt(activePromptId, { systemPrompt: val });
-    }
+  const buildFilledPrompt = () => {
+    let finalPrompt = content;
+    variables.forEach(v => {
+      const regex = new RegExp(`\\{\\{\\s*${escapeRegExp(v)}\\s*\\}\\}`, 'g');
+      finalPrompt = finalPrompt.replace(regex, filledVars[v] || '');
+    });
+    return finalPrompt;
   };
 
-  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setContent(val);
-    extractVariables(val);
-    if (activePromptId) {
-      updatePrompt(activePromptId, { content: val });
-    }
+  const handleSystemPromptValueChange = (value: string) => {
+    setSystemPrompt(value);
+    queuePromptUpdate({ systemPrompt: value });
+  };
+
+  const handleContentValueChange = (value: string) => {
+    setContent(value);
+    setVariables(extractPromptVariables(value));
+    queuePromptUpdate({ content: value });
   };
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setTitle(val);
-    if (activePromptId) {
-      updatePrompt(activePromptId, { title: val });
-    }
+    queuePromptUpdate({ title: val });
   };
 
   const toggleFavorite = () => {
@@ -196,17 +252,13 @@ export default function Editor() {
   };
 
   const handleDelete = () => {
-    if (activePromptId) {
+    if (activePromptId && window.confirm(t.confirmDeletePrompt)) {
       deletePrompt(activePromptId);
     }
   };
 
   const handleCopy = async () => {
-    let finalPrompt = content;
-    variables.forEach(v => {
-      const regex = new RegExp(`\\{\\{${v}\\}\\}`, 'g');
-      finalPrompt = finalPrompt.replace(regex, filledVars[v] || '');
-    });
+    const finalPrompt = buildFilledPrompt();
     
     try {
       await navigator.clipboard.writeText(finalPrompt);
@@ -218,11 +270,7 @@ export default function Editor() {
   };
 
   const handleCopyJson = async () => {
-    let finalPrompt = content;
-    variables.forEach(v => {
-      const regex = new RegExp(`\\{\\{${v}\\}\\}`, 'g');
-      finalPrompt = finalPrompt.replace(regex, filledVars[v] || '');
-    });
+    const finalPrompt = buildFilledPrompt();
     
     const messages = [];
     if (systemPrompt.trim()) {
@@ -240,25 +288,24 @@ export default function Editor() {
   };
 
   const handleSaveTestCase = () => {
-    const name = window.prompt("Enter test case name (e.g., Formal Tone):");
+    const name = testCaseName.trim();
     if (!name || !activePromptId) return;
     const currentCases = prompt?.testCases || [];
     const newCase = { id: generateId(), name, values: { ...filledVars } };
     updatePrompt(activePromptId, { testCases: [...currentCases, newCase] });
     setActiveTestCaseId(newCase.id);
+    setTestCaseName('');
+    setIsSavingTestCase(false);
   };
 
   const handleRunTest = async () => {
     if (!apiKey) {
-      alert('Please configure your API Key in Settings first.');
+      setTestStatus('error');
+      setTestResult(t.apiKeyMissing);
       return;
     }
 
-    let finalPrompt = content;
-    variables.forEach(v => {
-      const regex = new RegExp(`\\{\\{${v}\\}\\}`, 'g');
-      finalPrompt = finalPrompt.replace(regex, filledVars[v] || '');
-    });
+    const finalPrompt = buildFilledPrompt();
 
     const messages = [];
     if (systemPrompt.trim()) {
@@ -293,49 +340,20 @@ export default function Editor() {
       });
       
       if (!response.ok) {
-        let errorMsg = `API Error: ${response.status} ${response.statusText}`;
-        try {
-          const errBody = await response.json();
-          if (errBody.error && errBody.error.message) {
-            errorMsg += `\n\n${errBody.error.message}`;
-          } else if (errBody.message) {
-            errorMsg += `\n\n${errBody.message}`;
-          }
-        } catch(e) {}
-        throw new Error(errorMsg);
+        throw new Error(await readChatError(response));
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      
-      if (reader) {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n').filter(line => line.trim() !== '');
-          for (const line of lines) {
-            if (line.replace(/^data: /, '') === '[DONE]') break;
-            if (line.startsWith('data: ')) {
-              try {
-                const parsed = JSON.parse(line.replace(/^data: /, ''));
-                if (parsed.choices?.[0]?.delta?.content) {
-                  setTestResult(prev => prev + parsed.choices[0].delta.content);
-                }
-                if (parsed.usage) {
-                  setTestUsage(parsed.usage);
-                }
-              } catch (e) {}
-            }
-          }
-        }
-      }
+      await readChatCompletionStream({
+        response,
+        onContent: (text) => setTestResult(prev => prev + text),
+        onUsage: setTestUsage,
+      });
       setTestStatus('success');
       setTestDuration(Date.now() - startTime);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setTestStatus('error');
       setTestDuration(Date.now() - startTime);
-      setTestResult(err.message || 'Unknown error occurred.');
+      setTestResult(getErrorMessage(err, 'Unknown error occurred.'));
     }
   };
 
@@ -480,7 +498,7 @@ export default function Editor() {
             )}
             <SimpleEditor
               value={systemPrompt}
-              onValueChange={val => handleSystemPromptChange({ target: { value: val } } as any)}
+              onValueChange={handleSystemPromptValueChange}
               highlight={code => code}
               padding={0}
               textareaClassName="focus:outline-none"
@@ -498,7 +516,7 @@ export default function Editor() {
           )}
           <SimpleEditor
             value={content}
-            onValueChange={val => handleContentChange({ target: { value: val } } as any)}
+            onValueChange={handleContentValueChange}
             highlight={highlightVariables}
             padding={0}
             textareaClassName="focus:outline-none"
@@ -520,15 +538,44 @@ export default function Editor() {
               <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">{t.variables}</h3>
               {variables.length > 0 && (
                 <button 
-                  onClick={handleSaveTestCase}
+                  onClick={() => setIsSavingTestCase(true)}
                   className="text-xs flex items-center gap-1 text-indigo-500 hover:text-indigo-400 transition-colors font-medium"
-                  title="Save current values as a Test Case"
+                  title={t.saveTestCaseValues}
                 >
                   <Save size={12} />
                   {t.saveTestCase}
                 </button>
               )}
             </div>
+            {isSavingTestCase && variables.length > 0 && (
+              <div className="mb-4 rounded-lg border border-border bg-background p-3 space-y-2">
+                <label className="block text-xs font-medium text-gray-500">{t.testCaseName}</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={testCaseName}
+                    onChange={(e) => setTestCaseName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveTestCase();
+                      if (e.key === 'Escape') {
+                        setIsSavingTestCase(false);
+                        setTestCaseName('');
+                      }
+                    }}
+                    placeholder={t.testCaseNamePlaceholder}
+                    className="min-w-0 flex-1 bg-panel text-sm px-2 py-1.5 rounded border border-border focus:border-indigo-500/50 outline-none"
+                  />
+                  <button
+                    onClick={handleSaveTestCase}
+                    disabled={!testCaseName.trim()}
+                    className="px-2.5 py-1.5 rounded bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium"
+                  >
+                    {t.saveTestCase}
+                  </button>
+                </div>
+              </div>
+            )}
             
             {prompt?.testCases && prompt.testCases.length > 0 && (
               <div className="mb-4">
@@ -624,7 +671,7 @@ export default function Editor() {
             {isModelConfigOpen && (
               <div className="mt-3 space-y-3 p-3 bg-background border border-border rounded-lg text-sm">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Model Name</label>
+                  <label className="block text-xs text-gray-500 mb-1">{t.modelName}</label>
                   <input 
                     type="text"
                     value={prompt.modelConfig?.modelName || ''}
@@ -634,7 +681,7 @@ export default function Editor() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Temperature ({prompt.modelConfig?.temperature ?? 0.7})</label>
+                  <label className="block text-xs text-gray-500 mb-1">{t.temperature} ({prompt.modelConfig?.temperature ?? 0.7})</label>
                   <input 
                     type="range"
                     min="0" max="2" step="0.1"
@@ -696,8 +743,13 @@ export default function Editor() {
         currentSystemPrompt={systemPrompt}
         currentContent={content}
         onApply={(newSystem, newContent) => {
-          handleSystemPromptChange({ target: { value: newSystem } } as any);
-          handleContentChange({ target: { value: newContent } } as any);
+          setSystemPrompt(newSystem);
+          setContent(newContent);
+          setVariables(extractPromptVariables(newContent));
+          if (activePromptId) {
+            flushPendingPromptUpdate();
+            updatePrompt(activePromptId, { systemPrompt: newSystem, content: newContent });
+          }
         }}
       />
     </div>

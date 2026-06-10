@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import CommandPalette from "@/components/command-palette/CommandPalette";
@@ -7,12 +7,15 @@ export const metadata: Metadata = {
   title: "PromptGrid",
   description: "A functional, minimalist prompt manager.",
   manifest: "/manifest.json",
-  themeColor: "#09090b",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "PromptGrid",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#09090b",
 };
 
 export default function RootLayout({

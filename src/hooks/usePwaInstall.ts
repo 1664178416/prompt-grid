@@ -12,21 +12,25 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
+declare global {
+  interface Window {
+    deferredPwaPrompt: BeforeInstallPromptEvent | null;
+  }
+}
+
+function isStandaloneDisplay() {
+  return typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches;
+}
+
 export function usePwaInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstallable, setIsInstallable] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(isStandaloneDisplay);
 
   useEffect(() => {
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstalled(true);
-    }
-
     const checkGlobalPrompt = () => {
-      const w = window as any;
-      if (w.deferredPwaPrompt) {
-        setDeferredPrompt(w.deferredPwaPrompt);
+      if (window.deferredPwaPrompt) {
+        setDeferredPrompt(window.deferredPwaPrompt);
         setIsInstallable(true);
       }
     };

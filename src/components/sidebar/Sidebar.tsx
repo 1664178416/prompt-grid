@@ -4,18 +4,16 @@ import { usePromptStore } from '@/store/usePromptStore';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
-import { FolderPlus, Inbox, Star, Layers, Folder, Search, Settings, Download } from 'lucide-react';
+import { FolderPlus, Inbox, Star, Layers, Folder, Search, Settings, Download, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
-import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { useEnvironment } from '@/hooks/useEnvironment';
 import SettingsModal from './SettingsModal';
 
 export default function Sidebar() {
-  const { activeFolderId, setActiveFolder, createFolder } = usePromptStore();
+  const { activeFolderId, activeTag, setActiveFolder, setActiveTag, createFolder, deleteFolder, setCommandPaletteOpen } = usePromptStore();
   const { language } = useSettingsStore();
   const t = i18n[language];
-  const { isInstallable, install } = usePwaInstall();
   const { isWeb } = useEnvironment();
   
   const folders = useLiveQuery(() => db.folders.toArray()) || [];
@@ -63,14 +61,26 @@ export default function Sidebar() {
           </div>
           <div className="space-y-0.5">
             {folders.map(folder => (
-              <NavItem 
-                key={folder.id} 
-                icon={<Folder size={16} className="text-gray-400" />} 
-                label={folder.name} 
-                active={activeFolderId === folder.id} 
-                onClick={() => setActiveFolder(folder.id)} 
-                count={prompts.filter(p => p.folderId === folder.id).length}
-              />
+              <div key={folder.id} className="group relative">
+                <NavItem 
+                  icon={<Folder size={16} className="text-gray-400" />} 
+                  label={folder.name} 
+                  active={activeFolderId === folder.id} 
+                  onClick={() => setActiveFolder(folder.id)} 
+                  count={prompts.filter(p => p.folderId === folder.id).length}
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(t.confirmDeleteFolder)) {
+                      deleteFolder(folder.id);
+                    }
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-gray-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
             ))}
             
             {isCreating && (
@@ -100,12 +110,11 @@ export default function Sidebar() {
               <button
                 key={tag}
                 onClick={() => {
-                  const { activeTag, setActiveTag } = usePromptStore.getState();
                   setActiveTag(activeTag === tag ? null : tag);
                 }}
                 className={cn(
                   "px-2 py-1 text-[10px] font-medium rounded-full transition-colors border",
-                  usePromptStore.getState().activeTag === tag
+                  activeTag === tag
                     ? "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
                     : "bg-panel border-border text-gray-500 hover:text-gray-300 hover:border-gray-600"
                 )}
@@ -120,7 +129,7 @@ export default function Sidebar() {
       {/* Footer Area */}
       <div className="p-4 border-t border-border mt-auto bg-panel/50 space-y-2">
         <button 
-          onClick={() => usePromptStore.getState().setCommandPaletteOpen(true)}
+          onClick={() => setCommandPaletteOpen(true)}
           className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg bg-background border border-border shadow-sm text-sm text-gray-400 hover:text-foreground hover:border-indigo-500/50 hover:shadow-indigo-500/10 transition-all group"
         >
           <Search size={15} />
@@ -149,7 +158,7 @@ export default function Sidebar() {
             className="w-full flex items-center justify-center gap-2 px-3 py-2 mt-2 text-sm font-medium text-white bg-indigo-500 hover:bg-indigo-600 rounded-md transition-colors shadow-sm"
           >
             <Download size={16} />
-            <span>Download Desktop App</span>
+            <span>{t.downloadDesktopApp}</span>
           </a>
         )}
       </div>

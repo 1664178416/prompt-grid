@@ -1,18 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useHydrated } from './useHydrated';
 
 export function useEnvironment() {
-  const [isElectron, setIsElectron] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const userAgent = navigator.userAgent.toLowerCase();
-      if (userAgent.includes('electron')) {
-        setIsElectron(true);
-      }
-    }
-  }, []);
+  const hydrated = useHydrated();
+  const isElectron = hydrated && navigator.userAgent.toLowerCase().includes('electron');
 
   return { isElectron, isWeb: !isElectron };
 }
