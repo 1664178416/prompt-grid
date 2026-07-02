@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import CommandPalette from "@/components/command-palette/CommandPalette";
@@ -30,25 +31,23 @@ export default function RootLayout({
           {children}
           <CommandPalette />
         </ThemeProvider>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.deferredPwaPrompt = null;
-              window.addEventListener('beforeinstallprompt', function(e) {
-                e.preventDefault();
-                window.deferredPwaPrompt = e;
-                window.dispatchEvent(new Event('pwa-prompt-ready'));
-              });
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').catch(function(err) {
-                    console.error('ServiceWorker error: ', err);
-                  });
+        <Script id="pwa-bootstrap" strategy="beforeInteractive">
+          {`
+            window.deferredPwaPrompt = null;
+            window.addEventListener('beforeinstallprompt', function(e) {
+              e.preventDefault();
+              window.deferredPwaPrompt = e;
+              window.dispatchEvent(new Event('pwa-prompt-ready'));
+            });
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                  console.error('ServiceWorker error: ', err);
                 });
-              }
-            `,
-          }}
-        />
+              });
+            }
+          `}
+        </Script>
       </body>
     </html>
   );

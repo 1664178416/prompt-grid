@@ -11,6 +11,15 @@ import { useRouter } from 'next/navigation';
 import { useHydrated } from '@/hooks/useHydrated';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 
+function isEditableEventTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+
+  const editable = target.closest('input, textarea, select, [contenteditable]');
+  if (!(editable instanceof HTMLElement)) return false;
+
+  return editable.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(editable.tagName);
+}
+
 function GlobalShortcuts() {
   const { createPrompt, activeFolderId, setActivePrompt, deletePrompt, activePromptId } = usePromptStore();
   const { language } = useSettingsStore();
@@ -18,6 +27,8 @@ function GlobalShortcuts() {
 
   useEffect(() => {
     const down = async (e: KeyboardEvent) => {
+      if (isEditableEventTarget(e.target)) return;
+
       if (e.key === 'n' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         const id = await createPrompt(activeFolderId === 'favorites' ? null : activeFolderId);
@@ -49,6 +60,7 @@ export default function Home() {
   
   const isResizingSidebar = useRef(false);
   const isResizingList = useRef(false);
+  const activeResizePointerId = useRef<number | null>(null);
 
   useEffect(() => {
     if (mounted && isWeb && !isLoggedIn) {
@@ -56,33 +68,43 @@ export default function Home() {
     }
   }, [mounted, isWeb, isLoggedIn, router]);
 
-  const startResizingSidebar = useCallback(() => {
+  const stopResizing = useCallback(() => {
+    isResizingSidebar.current = false;
+    isResizingList.current = false;
+    activeResizePointerId.current = null;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  const startResizingSidebar = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    activeResizePointerId.current = event.pointerId;
     isResizingSidebar.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, []);
 
-  const startResizingList = useCallback(() => {
+  const startResizingList = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    activeResizePointerId.current = event.pointerId;
     isResizingList.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, []);
 
-  const stopResizing = useCallback(() => {
-    isResizingSidebar.current = false;
-    isResizingList.current = false;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  }, []);
+  const resize = useCallback((pointerMoveEvent: PointerEvent) => {
+    if (activeResizePointerId.current !== pointerMoveEvent.pointerId) return;
+    pointerMoveEvent.preventDefault();
 
-  const resize = useCallback((mouseMoveEvent: MouseEvent) => {
     if (isResizingSidebar.current) {
-      const newWidth = mouseMoveEvent.clientX;
+      const newWidth = pointerMoveEvent.clientX;
       if (newWidth > 180 && newWidth < 400) {
         setSidebarWidth(newWidth);
       }
     } else if (isResizingList.current) {
-      const newWidth = mouseMoveEvent.clientX - sidebarWidth;
+      const newWidth = pointerMoveEvent.clientX - sidebarWidth;
       if (newWidth > 200 && newWidth < 600) {
         setListWidth(newWidth);
       }
@@ -90,11 +112,15 @@ export default function Home() {
   }, [sidebarWidth]);
 
   useEffect(() => {
-    window.addEventListener('mousemove', resize);
-    window.addEventListener('mouseup', stopResizing);
+    window.addEventListener('pointermove', resize);
+    window.addEventListener('pointerup', stopResizing);
+    window.addEventListener('pointercancel', stopResizing);
+    window.addEventListener('blur', stopResizing);
     return () => {
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
+      window.removeEventListener('pointermove', resize);
+      window.removeEventListener('pointerup', stopResizing);
+      window.removeEventListener('pointercancel', stopResizing);
+      window.removeEventListener('blur', stopResizing);
     };
   }, [resize, stopResizing]);
 
@@ -106,16 +132,16 @@ export default function Home() {
       <div style={{ width: sidebarWidth }} className="flex-shrink-0 relative">
         <Sidebar />
         <div 
-          className="absolute top-0 -right-0.5 w-1.5 h-full cursor-col-resize hover:bg-indigo-500 bg-transparent transition-colors z-20"
-          onMouseDown={startResizingSidebar}
+          className="absolute top-0 -right-0.5 w-1.5 h-full cursor-col-resize touch-none hover:bg-indigo-500 bg-transparent transition-colors z-20"
+          onPointerDown={startResizingSidebar}
         />
       </div>
       
       <div style={{ width: listWidth }} className="flex-shrink-0 relative">
         <PromptList />
         <div 
-          className="absolute top-0 -right-0.5 w-1.5 h-full cursor-col-resize hover:bg-indigo-500 bg-transparent transition-colors z-20"
-          onMouseDown={startResizingList}
+          className="absolute top-0 -right-0.5 w-1.5 h-full cursor-col-resize touch-none hover:bg-indigo-500 bg-transparent transition-colors z-20"
+          onPointerDown={startResizingList}
         />
       </div>
       
