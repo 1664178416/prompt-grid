@@ -55,7 +55,12 @@ export default function Sidebar() {
         <div>
           <div className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center justify-between">
             <span>{t.folders}</span>
-            <button onClick={() => setIsCreating(true)} className="hover:text-gray-300">
+            <button
+              onClick={() => setIsCreating(true)}
+              className="hover:text-gray-300"
+              title={t.createFolderAction}
+              aria-label={t.createFolderAction}
+            >
               <FolderPlus size={14} />
             </button>
           </div>
@@ -77,6 +82,8 @@ export default function Sidebar() {
                     }
                   }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-gray-500 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                  title={t.deleteFolder}
+                  aria-label={`${t.deleteFolder}: ${folder.name}`}
                 >
                   <Trash2 size={12} />
                 </button>

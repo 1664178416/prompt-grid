@@ -25,36 +25,50 @@ export async function readChatCompletionStream({
   onUsage,
 }: ReadChatCompletionStreamOptions) {
   const reader = response.body?.getReader();
-  if (!reader) return;
+  if (!reader) {
+    throw new Error('API response did not include a readable stream.');
+  }
 
   const decoder = new TextDecoder();
   let buffer = '';
 
+  const processLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith('data:')) return false;
+
+    const payload = trimmed.replace(/^data:\s*/, '');
+    if (payload === '[DONE]') return true;
+
+    try {
+      const parsed = JSON.parse(payload) as StreamChunk;
+      const content = parsed.choices?.[0]?.delta?.content;
+
+      if (content) onContent(content);
+      if (parsed.usage) onUsage?.(parsed.usage);
+    } catch {
+      // Ignore provider-specific keepalive or malformed chunks.
+    }
+
+    return false;
+  };
+
+  const processBuffer = (flush = false) => {
+    const lines = buffer.split(/\r?\n/);
+    buffer = flush ? '' : (lines.pop() ?? '');
+
+    return lines.some(processLine);
+  };
+
   while (true) {
     const { value, done } = await reader.read();
-    if (done) break;
+    if (done) {
+      buffer += decoder.decode();
+      if (buffer) processLine(buffer);
+      break;
+    }
 
     buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith('data: ')) continue;
-
-      const payload = trimmed.replace(/^data:\s*/, '');
-      if (payload === '[DONE]') return;
-
-      try {
-        const parsed = JSON.parse(payload) as StreamChunk;
-        const content = parsed.choices?.[0]?.delta?.content;
-
-        if (content) onContent(content);
-        if (parsed.usage) onUsage?.(parsed.usage);
-      } catch {
-        // Ignore incomplete or provider-specific keepalive chunks.
-      }
-    }
+    if (processBuffer()) return;
   }
 }
 
@@ -71,4 +85,3 @@ export async function readChatError(response: Response) {
 
   return message;
 }
-

@@ -8,15 +8,42 @@ import { useCallback, useEffect, useState, useRef } from 'react';
 import { Play, Copy, Star, Trash2, Folder, ChevronDown, Check, Loader2, Settings2, Save, FileJson, Sparkles } from 'lucide-react';
 import { cn, escapeRegExp, generateId, getErrorMessage } from '@/lib/utils';
 import { readChatCompletionStream, readChatError, type ChatUsage } from '@/lib/openai-stream';
+import dynamic from 'next/dynamic';
 import SimpleEditor from 'react-simple-code-editor';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import css from 'react-syntax-highlighter/dist/esm/languages/prism/css';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
+import markdown from 'react-syntax-highlighter/dist/esm/languages/prism/markdown';
+import markup from 'react-syntax-highlighter/dist/esm/languages/prism/markup';
+import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
+import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import PromptOptimizerModal from './PromptOptimizerModal';
+
+const PromptOptimizerModal = dynamic(() => import('./PromptOptimizerModal'));
+
+SyntaxHighlighter.registerLanguage('bash', bash);
+SyntaxHighlighter.registerLanguage('css', css);
+SyntaxHighlighter.registerLanguage('javascript', javascript);
+SyntaxHighlighter.registerLanguage('json', json);
+SyntaxHighlighter.registerLanguage('jsx', jsx);
+SyntaxHighlighter.registerLanguage('markdown', markdown);
+SyntaxHighlighter.registerLanguage('markup', markup);
+SyntaxHighlighter.registerLanguage('python', python);
+SyntaxHighlighter.registerLanguage('tsx', tsx);
+SyntaxHighlighter.registerLanguage('typescript', typescript);
+SyntaxHighlighter.alias('javascript', ['js']);
+SyntaxHighlighter.alias('typescript', ['ts']);
+SyntaxHighlighter.alias('bash', ['sh', 'shell']);
+SyntaxHighlighter.alias('markup', ['html', 'xml']);
 
 function extractPromptVariables(text: string) {
   if (!text) return [];
@@ -119,6 +146,7 @@ export default function Editor() {
   const pendingPromptUpdate = useRef<{ id: string; data: Partial<Prompt> } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncedPromptId = useRef<string | null>(null);
+  const testAbortController = useRef<AbortController | null>(null);
   
   const folders = useLiveQuery(() => db.folders.toArray()) || [];
 
@@ -192,6 +220,13 @@ export default function Editor() {
   useEffect(() => {
     return () => flushPendingPromptUpdate();
   }, [flushPendingPromptUpdate]);
+
+  useEffect(() => {
+    return () => {
+      testAbortController.current?.abort();
+      testAbortController.current = null;
+    };
+  }, [activePromptId]);
 
   const addTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && tagInput.trim()) {
@@ -317,6 +352,10 @@ export default function Editor() {
     setTestResult('');
     setTestUsage(null);
     setTestDuration(null);
+
+    testAbortController.current?.abort();
+    const controller = new AbortController();
+    testAbortController.current = controller;
     
     const startTime = Date.now();
     
@@ -326,6 +365,7 @@ export default function Editor() {
     try {
       const response = await fetch(`${cleanBaseUrl}/chat/completions`, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${cleanApiKey}`
@@ -345,15 +385,29 @@ export default function Editor() {
 
       await readChatCompletionStream({
         response,
-        onContent: (text) => setTestResult(prev => prev + text),
-        onUsage: setTestUsage,
+        onContent: (text) => {
+          if (!controller.signal.aborted) {
+            setTestResult(prev => prev + text);
+          }
+        },
+        onUsage: (usage) => {
+          if (!controller.signal.aborted) {
+            setTestUsage(usage);
+          }
+        },
       });
+      if (controller.signal.aborted) return;
       setTestStatus('success');
       setTestDuration(Date.now() - startTime);
     } catch (err: unknown) {
+      if (controller.signal.aborted) return;
       setTestStatus('error');
       setTestDuration(Date.now() - startTime);
       setTestResult(getErrorMessage(err, 'Unknown error occurred.'));
+    } finally {
+      if (testAbortController.current === controller) {
+        testAbortController.current = null;
+      }
     }
   };
 
@@ -395,12 +449,16 @@ export default function Editor() {
             <button 
               onClick={toggleFavorite}
               className={cn("w-8 h-8 rounded flex items-center justify-center transition-colors hover:bg-panel", prompt.isFavorite ? "text-amber-400" : "text-gray-400")}
+              title={prompt.isFavorite ? t.removeFavorite : t.addFavorite}
+              aria-label={prompt.isFavorite ? t.removeFavorite : t.addFavorite}
             >
               <Star size={16} className={prompt.isFavorite ? "fill-amber-400" : ""} />
             </button>
             <button 
               onClick={handleDelete}
               className="w-8 h-8 rounded flex items-center justify-center transition-colors hover:bg-red-500/10 text-gray-400 hover:text-red-400"
+              title={t.deletePrompt}
+              aria-label={t.deletePrompt}
             >
               <Trash2 size={16} />
             </button>
@@ -470,7 +528,14 @@ export default function Editor() {
               {prompt.tags?.map(tag => (
                 <span key={tag} className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                   #{tag}
-                  <button onClick={() => removeTag(tag)} className="hover:text-indigo-500">×</button>
+                  <button
+                    onClick={() => removeTag(tag)}
+                    className="hover:text-indigo-500"
+                    title={t.removeTag}
+                    aria-label={`${t.removeTag}: ${tag}`}
+                  >
+                    ×
+                  </button>
                 </span>
               ))}
               <input
@@ -675,7 +740,7 @@ export default function Editor() {
                   <input 
                     type="text"
                     value={prompt.modelConfig?.modelName || ''}
-                    onChange={(e) => updatePrompt(activePromptId, { modelConfig: { ...prompt.modelConfig, modelName: e.target.value, temperature: prompt.modelConfig?.temperature || 0.7 }})}
+                    onChange={(e) => updatePrompt(activePromptId, { modelConfig: { ...prompt.modelConfig, modelName: e.target.value, temperature: prompt.modelConfig?.temperature ?? 0.7 }})}
                     placeholder={defaultModel}
                     className="w-full bg-panel text-sm px-2 py-1.5 rounded border border-border focus:border-indigo-500/50 outline-none"
                   />

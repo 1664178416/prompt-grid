@@ -81,9 +81,10 @@ export const usePromptStore = create<PromptState>((set, get) => ({
   },
 
   deleteFolder: async (id) => {
-    await db.folders.delete(id);
-    // Also delete or orphan prompts? Let's just orphan them for MVP
-    await db.prompts.where('folderId').equals(id).modify({ folderId: null });
+    await db.transaction('rw', db.folders, db.prompts, async () => {
+      await db.prompts.where('folderId').equals(id).modify({ folderId: null });
+      await db.folders.delete(id);
+    });
     const { activeFolderId } = get();
     if (activeFolderId === id) {
       set({ activeFolderId: null });

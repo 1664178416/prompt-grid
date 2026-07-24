@@ -74,17 +74,24 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
       {/* Click outside to close */}
       <div className="absolute inset-0" onClick={onClose} />
       
-      <div className="relative w-full max-w-md bg-panel border border-border rounded-xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+        className="relative w-full max-w-md bg-panel border border-border rounded-xl shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200"
+      >
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-2">
             <SettingsIcon size={18} className="text-indigo-500" />
-            <h2 className="font-semibold text-lg">{t.settings}</h2>
+            <h2 id="settings-title" className="font-semibold text-lg">{t.settings}</h2>
           </div>
           <button 
             onClick={onClose}
             className="text-gray-400 hover:text-foreground transition-colors"
+            title={t.cancel}
+            aria-label={t.cancel}
           >
             <X size={20} />
           </button>
@@ -101,12 +108,16 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                 <button
                   onClick={() => setTheme('light')}
                   className={`p-1.5 rounded-md transition-colors ${theme === 'light' ? 'bg-panel shadow-sm text-indigo-500' : 'text-gray-500 hover:text-foreground'}`}
+                  title={t.light}
+                  aria-label={t.light}
                 >
                   <Sun size={16} />
                 </button>
                 <button
                   onClick={() => setTheme('dark')}
                   className={`p-1.5 rounded-md transition-colors ${theme === 'dark' ? 'bg-panel shadow-sm text-indigo-500' : 'text-gray-500 hover:text-foreground'}`}
+                  title={t.dark}
+                  aria-label={t.dark}
                 >
                   <Moon size={16} />
                 </button>

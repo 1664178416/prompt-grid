@@ -70,7 +70,7 @@ export default function PromptList() {
       filtered = filtered.filter(p => p.title.toLowerCase().includes(q) || p.content.toLowerCase().includes(q));
     }
     
-    return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
+    return [...filtered].sort((a, b) => b.updatedAt - a.updatedAt);
   }, [allPrompts, activeFolderId, activeTag, searchQuery]);
 
   const handleCreate = async () => {
@@ -120,6 +120,8 @@ export default function PromptList() {
           <button 
             onClick={handleCreate}
             className="w-7 h-7 rounded flex items-center justify-center hover:bg-panel-hover text-gray-400 hover:text-foreground transition-colors"
+            title={t.createPromptAction}
+            aria-label={t.createPromptAction}
           >
             <Plus size={16} />
           </button>
@@ -172,6 +174,15 @@ function PromptCard({ prompt, isActive, onClick, onDelete, onToggleFavorite }: {
   return (
     <div
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-current={isActive ? 'true' : undefined}
       className={cn(
         "w-full text-left p-3 rounded-lg border transition-all duration-200 group flex flex-col gap-1.5 cursor-pointer",
         isActive 
@@ -187,12 +198,16 @@ function PromptCard({ prompt, isActive, onClick, onDelete, onToggleFavorite }: {
           <button 
             onClick={onToggleFavorite}
             className="text-gray-400 hover:text-amber-400 transition-colors p-1"
+            title={prompt.isFavorite ? t.removeFavorite : t.addFavorite}
+            aria-label={prompt.isFavorite ? t.removeFavorite : t.addFavorite}
           >
             <Star size={12} className={prompt.isFavorite ? "fill-amber-400 text-amber-400" : ""} />
           </button>
           <button 
             onClick={onDelete}
             className="text-gray-400 hover:text-red-400 transition-colors p-1"
+            title={t.deletePrompt}
+            aria-label={t.deletePrompt}
           >
             <Trash2 size={12} />
           </button>

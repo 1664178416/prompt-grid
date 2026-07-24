@@ -96,6 +96,8 @@ export default function CommandPalette() {
       // It's an action
       const actionIndex = index - filteredPrompts.length;
       const action = actions[actionIndex];
+      if (!action) return;
+
       if (action.id === 'new-prompt') {
         const id = await createPrompt(null);
         setActivePrompt(id);
@@ -138,7 +140,12 @@ export default function CommandPalette() {
       {/* Click outside to close */}
       <div className="absolute inset-0" onClick={() => setCommandPaletteOpen(false)} />
       
-      <div className="relative w-full max-w-xl bg-panel border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.searchPlaceholder}
+        className="relative w-full max-w-xl bg-panel border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200"
+      >
         {/* Search Input */}
         <div 
           className="flex items-center px-4 py-4 border-b border-border gap-3 cursor-text"

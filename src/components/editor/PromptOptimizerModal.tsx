@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { X, Sparkles, Loader2, Check } from 'lucide-react';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import SimpleEditor from 'react-simple-code-editor';
@@ -28,16 +28,22 @@ export default function PromptOptimizerModal({
   const [status, setStatus] = useState<'idle' | 'optimizing' | 'success' | 'error'>('idle');
   const [resultText, setResultText] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   useEffect(() => {
-    if (isOpen) {
-      const timer = window.setTimeout(() => {
-        setStatus('idle');
-        setResultText('');
-        setErrorMsg('');
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
+    if (!isOpen) return;
+
+    const timer = window.setTimeout(() => {
+      setStatus('idle');
+      setResultText('');
+      setErrorMsg('');
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+    };
   }, [isOpen]);
 
   const { parsedSystem, parsedUser } = useMemo(() => {
@@ -60,6 +66,10 @@ export default function PromptOptimizerModal({
     setStatus('optimizing');
     setResultText('');
     setErrorMsg('');
+
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const expertPrompt = `You are an elite AI Prompt Engineer. Your task is to rewrite the user's draft prompt to be extremely effective for LLMs.
 Follow these rules:
@@ -87,6 +97,7 @@ ${currentContent}`;
 
       const response = await fetch(`${cleanBaseUrl}/chat/completions`, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${cleanApiKey}`
@@ -108,12 +119,22 @@ ${currentContent}`;
 
       await readChatCompletionStream({
         response,
-        onContent: (text) => setResultText(prev => prev + text),
+        onContent: (text) => {
+          if (!controller.signal.aborted) {
+            setResultText(prev => prev + text);
+          }
+        },
       });
+      if (controller.signal.aborted) return;
       setStatus('success');
     } catch (err: unknown) {
+      if (controller.signal.aborted) return;
       setStatus('error');
       setErrorMsg(getErrorMessage(err));
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -121,7 +142,12 @@ ${currentContent}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-background border border-border w-[800px] h-[80vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="prompt-optimizer-title"
+        className="bg-background border border-border w-[800px] h-[80vh] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+      >
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panel/30">
@@ -130,13 +156,15 @@ ${currentContent}`;
               <Sparkles size={18} />
             </div>
             <div>
-              <h2 className="text-sm font-semibold">{t.optimizationTitle}</h2>
+              <h2 id="prompt-optimizer-title" className="text-sm font-semibold">{t.optimizationTitle}</h2>
               <p className="text-xs text-gray-500">{t.optimizationDesc}</p>
             </div>
           </div>
           <button 
             onClick={onClose}
             className="text-gray-500 hover:text-foreground transition-colors p-1"
+            title={t.cancel}
+            aria-label={t.cancel}
           >
             <X size={20} />
           </button>
