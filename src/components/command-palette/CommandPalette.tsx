@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState, useRef } from 'react';
 import { usePromptStore } from '@/store/usePromptStore';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -8,6 +8,8 @@ import { db } from '@/lib/db';
 import { Search, FileText, FolderPlus, Plus, Download, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createBackupData, downloadJsonBackup, importBackupData, parseBackupData } from '@/lib/backup';
+
+const MAX_PROMPT_RESULTS = 50;
 
 export default function CommandPalette() {
   const { isCommandPaletteOpen, setCommandPaletteOpen, setActivePrompt, createPrompt, createFolder } = usePromptStore();
@@ -17,16 +19,21 @@ export default function CommandPalette() {
   const [search, setSearch] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const deferredSearch = useDeferredValue(search);
 
-  const allPrompts = useLiveQuery(() => db.prompts.toArray());
+  const allPrompts = useLiveQuery(
+    () => isCommandPaletteOpen ? db.prompts.toArray() : [],
+    [isCommandPaletteOpen],
+    []
+  );
   
   const filteredPrompts = useMemo(() => {
-    const q = search.toLowerCase();
+    const q = deferredSearch.toLowerCase();
     return (allPrompts || []).filter(p => 
       p.title.toLowerCase().includes(q) || 
       p.content.toLowerCase().includes(q)
-    );
-  }, [allPrompts, search]);
+    ).slice(0, MAX_PROMPT_RESULTS);
+  }, [allPrompts, deferredSearch]);
 
   const actions = useMemo(() => [
     { id: 'new-prompt', label: t.createPromptAction, icon: <Plus size={16} /> },

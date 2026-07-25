@@ -6,9 +6,10 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Prompt } from '@/lib/db';
 import { cn } from '@/lib/utils';
 import { Plus, Sun, Moon, Star, Trash2 } from 'lucide-react';
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useDeferredValue, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { useHydrated } from '@/hooks/useHydrated';
+import { useVirtualizer } from '@tanstack/react-virtual';
 
 function ThemeToggle() {
   const { theme, setTheme, systemTheme } = useTheme();
@@ -53,6 +54,7 @@ export default function PromptList() {
   
   const livePrompts = useLiveQuery(() => db.prompts.toArray());
   const allPrompts = useMemo(() => livePrompts || [], [livePrompts]);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   
   const prompts = useMemo(() => {
     let filtered = allPrompts;
@@ -65,13 +67,31 @@ export default function PromptList() {
       filtered = filtered.filter(p => p.folderId === activeFolderId);
     }
     
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+    if (deferredSearchQuery) {
+      const q = deferredSearchQuery.toLowerCase();
       filtered = filtered.filter(p => p.title.toLowerCase().includes(q) || p.content.toLowerCase().includes(q));
     }
     
     return [...filtered].sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [allPrompts, activeFolderId, activeTag, searchQuery]);
+  }, [allPrompts, activeFolderId, activeTag, deferredSearchQuery]);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // TanStack Virtual manages its own mutable measurement state.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: prompts.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 112,
+    getItemKey: (index) => prompts[index].id,
+    overscan: 5,
+  });
+
+  useEffect(() => {
+    const activeIndex = prompts.findIndex((prompt) => prompt.id === activePromptId);
+    if (activeIndex >= 0) {
+      virtualizer.scrollToIndex(activeIndex, { align: 'auto' });
+    }
+  }, [activePromptId, prompts, virtualizer]);
 
   const handleCreate = async () => {
     const id = await createPrompt(activeFolderId === 'favorites' ? null : activeFolderId);
@@ -138,28 +158,44 @@ export default function PromptList() {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {prompts.length === 0 ? (
           <div className="text-center py-10 text-xs text-gray-500">{t.noPrompts}</div>
         ) : (
-          prompts.map(prompt => (
-            <PromptCard 
-              key={prompt.id} 
-              prompt={prompt} 
-              isActive={activePromptId === prompt.id}
-              onClick={() => setActivePrompt(prompt.id)}
-              onDelete={(e) => {
-                e.stopPropagation();
-                if (window.confirm(t.confirmDeletePrompt)) {
-                  deletePrompt(prompt.id);
-                }
-              }}
-              onToggleFavorite={(e) => {
-                e.stopPropagation();
-                updatePrompt(prompt.id, { isFavorite: !prompt.isFavorite });
-              }}
-            />
-          ))
+          <div
+            className="relative w-full"
+            style={{ height: virtualizer.getTotalSize() + 16 }}
+          >
+            {virtualizer.getVirtualItems().map((virtualItem) => {
+              const prompt = prompts[virtualItem.index];
+
+              return (
+                <div
+                  key={prompt.id}
+                  ref={virtualizer.measureElement}
+                  data-index={virtualItem.index}
+                  className="absolute left-0 top-0 w-full px-2 pb-1"
+                  style={{ transform: `translateY(${virtualItem.start + 8}px)` }}
+                >
+                  <PromptCard
+                    prompt={prompt}
+                    isActive={activePromptId === prompt.id}
+                    onClick={() => setActivePrompt(prompt.id)}
+                    onDelete={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(t.confirmDeletePrompt)) {
+                        deletePrompt(prompt.id);
+                      }
+                    }}
+                    onToggleFavorite={(e) => {
+                      e.stopPropagation();
+                      updatePrompt(prompt.id, { isFavorite: !prompt.isFavorite });
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
