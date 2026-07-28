@@ -10,10 +10,11 @@ import { useMemo, useEffect, useDeferredValue, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { useHydrated } from '@/hooks/useHydrated';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useShallow } from 'zustand/react/shallow';
 
 function ThemeToggle() {
   const { theme, setTheme, systemTheme } = useTheme();
-  const { language } = useSettingsStore();
+  const language = useSettingsStore((state) => state.language);
   const t = i18n[language];
   const mounted = useHydrated();
 
@@ -33,7 +34,9 @@ function ThemeToggle() {
 }
 
 function LangToggle() {
-  const { language, setLanguage } = useSettingsStore();
+  const { language, setLanguage } = useSettingsStore(
+    useShallow((state) => ({ language: state.language, setLanguage: state.setLanguage }))
+  );
   const t = i18n[language];
   
   return (
@@ -48,8 +51,20 @@ function LangToggle() {
 }
 
 export default function PromptList() {
-  const { activeFolderId, activeTag, activePromptId, setActivePrompt, createPrompt, updatePrompt, deletePrompt, searchQuery, setSearchQuery } = usePromptStore();
-  const { language } = useSettingsStore();
+  const { activeFolderId, activeTag, activePromptId, setActivePrompt, createPrompt, updatePrompt, deletePrompt, searchQuery, setSearchQuery } = usePromptStore(
+    useShallow((state) => ({
+      activeFolderId: state.activeFolderId,
+      activeTag: state.activeTag,
+      activePromptId: state.activePromptId,
+      setActivePrompt: state.setActivePrompt,
+      createPrompt: state.createPrompt,
+      updatePrompt: state.updatePrompt,
+      deletePrompt: state.deletePrompt,
+      searchQuery: state.searchQuery,
+      setSearchQuery: state.setSearchQuery,
+    }))
+  );
+  const language = useSettingsStore((state) => state.language);
   const t = i18n[language];
   
   const livePrompts = useLiveQuery(() => db.prompts.toArray());
@@ -203,7 +218,7 @@ export default function PromptList() {
 }
 
 function PromptCard({ prompt, isActive, onClick, onDelete, onToggleFavorite }: { prompt: Prompt, isActive: boolean, onClick: () => void, onDelete: (e: React.MouseEvent<HTMLButtonElement>) => void, onToggleFavorite: (e: React.MouseEvent<HTMLButtonElement>) => void }) {
-  const { language } = useSettingsStore();
+  const language = useSettingsStore((state) => state.language);
   const t = i18n[language];
   const estimatedTokens = Math.ceil(((prompt.content || '').split(/\s+/).filter(Boolean).length || 0) * 1.3);
   

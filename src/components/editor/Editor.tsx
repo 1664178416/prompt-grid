@@ -27,6 +27,7 @@ import python from 'react-syntax-highlighter/dist/esm/languages/prism/python';
 import tsx from 'react-syntax-highlighter/dist/esm/languages/prism/tsx';
 import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useShallow } from 'zustand/react/shallow';
 
 const PromptOptimizerModal = dynamic(() => import('./PromptOptimizerModal'));
 
@@ -108,8 +109,22 @@ const CodeBlock = ({ inline, className, children, ...props }: CodeBlockProps) =>
 };
 
 export default function Editor() {
-  const { activePromptId, updatePrompt, deletePrompt, setCommandPaletteOpen } = usePromptStore();
-  const { language, apiKey, apiBaseUrl, defaultModel } = useSettingsStore();
+  const { activePromptId, updatePrompt, deletePrompt, setCommandPaletteOpen } = usePromptStore(
+    useShallow((state) => ({
+      activePromptId: state.activePromptId,
+      updatePrompt: state.updatePrompt,
+      deletePrompt: state.deletePrompt,
+      setCommandPaletteOpen: state.setCommandPaletteOpen,
+    }))
+  );
+  const { language, apiKey, apiBaseUrl, defaultModel } = useSettingsStore(
+    useShallow((state) => ({
+      language: state.language,
+      apiKey: state.apiKey,
+      apiBaseUrl: state.apiBaseUrl,
+      defaultModel: state.defaultModel,
+    }))
+  );
   const t = i18n[language];
   
   const prompt = useLiveQuery(

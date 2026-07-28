@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
 import { useHydrated } from '@/hooks/useHydrated';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
+import { useShallow } from 'zustand/react/shallow';
 
 function isEditableEventTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -21,8 +22,16 @@ function isEditableEventTarget(target: EventTarget | null) {
 }
 
 function GlobalShortcuts() {
-  const { createPrompt, activeFolderId, setActivePrompt, deletePrompt, activePromptId } = usePromptStore();
-  const { language } = useSettingsStore();
+  const { createPrompt, activeFolderId, setActivePrompt, deletePrompt, activePromptId } = usePromptStore(
+    useShallow((state) => ({
+      createPrompt: state.createPrompt,
+      activeFolderId: state.activeFolderId,
+      setActivePrompt: state.setActivePrompt,
+      deletePrompt: state.deletePrompt,
+      activePromptId: state.activePromptId,
+    }))
+  );
+  const language = useSettingsStore((state) => state.language);
   const t = i18n[language];
 
   useEffect(() => {
@@ -54,7 +63,7 @@ export default function Home() {
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const [listWidth, setListWidth] = useState(320);
   const { isWeb } = useEnvironment();
-  const { isLoggedIn } = useAuthStore();
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
   const router = useRouter();
   const mounted = useHydrated();
   

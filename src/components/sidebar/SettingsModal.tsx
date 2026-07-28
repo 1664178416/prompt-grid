@@ -5,6 +5,7 @@ import { useSettingsStore, i18n, type Language } from '@/store/useSettingsStore'
 import { useTheme } from 'next-themes';
 import { X, Moon, Sun, Settings as SettingsIcon, Download, Upload } from 'lucide-react';
 import { createBackupData, downloadJsonBackup, importBackupData, parseBackupData, type ImportMode } from '@/lib/backup';
+import { useShallow } from 'zustand/react/shallow';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -16,7 +17,18 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     apiKey, setApiKey, 
     apiBaseUrl, setApiBaseUrl, 
     defaultModel, setDefaultModel 
-  } = useSettingsStore();
+  } = useSettingsStore(
+    useShallow((state) => ({
+      language: state.language,
+      setLanguage: state.setLanguage,
+      apiKey: state.apiKey,
+      setApiKey: state.setApiKey,
+      apiBaseUrl: state.apiBaseUrl,
+      setApiBaseUrl: state.setApiBaseUrl,
+      defaultModel: state.defaultModel,
+      setDefaultModel: state.setDefaultModel,
+    }))
+  );
   
   const { theme, setTheme } = useTheme();
   const t = i18n[language];

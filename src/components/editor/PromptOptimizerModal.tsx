@@ -6,6 +6,7 @@ import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import SimpleEditor from 'react-simple-code-editor';
 import { getErrorMessage } from '@/lib/utils';
 import { readChatCompletionStream, readChatError } from '@/lib/openai-stream';
+import { useShallow } from 'zustand/react/shallow';
 
 interface PromptOptimizerModalProps {
   isOpen: boolean;
@@ -22,7 +23,14 @@ export default function PromptOptimizerModal({
   currentContent,
   onApply
 }: PromptOptimizerModalProps) {
-  const { language, apiKey, apiBaseUrl, defaultModel } = useSettingsStore();
+  const { language, apiKey, apiBaseUrl, defaultModel } = useSettingsStore(
+    useShallow((state) => ({
+      language: state.language,
+      apiKey: state.apiKey,
+      apiBaseUrl: state.apiBaseUrl,
+      defaultModel: state.defaultModel,
+    }))
+  );
   const t = i18n[language];
 
   const [status, setStatus] = useState<'idle' | 'optimizing' | 'success' | 'error'>('idle');

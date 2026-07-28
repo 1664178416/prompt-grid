@@ -8,12 +8,21 @@ import { db } from '@/lib/db';
 import { Search, FileText, FolderPlus, Plus, Download, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createBackupData, downloadJsonBackup, importBackupData, parseBackupData } from '@/lib/backup';
+import { useShallow } from 'zustand/react/shallow';
 
 const MAX_PROMPT_RESULTS = 50;
 
 export default function CommandPalette() {
-  const { isCommandPaletteOpen, setCommandPaletteOpen, setActivePrompt, createPrompt, createFolder } = usePromptStore();
-  const { language } = useSettingsStore();
+  const { isCommandPaletteOpen, setCommandPaletteOpen, setActivePrompt, createPrompt, createFolder } = usePromptStore(
+    useShallow((state) => ({
+      isCommandPaletteOpen: state.isCommandPaletteOpen,
+      setCommandPaletteOpen: state.setCommandPaletteOpen,
+      setActivePrompt: state.setActivePrompt,
+      createPrompt: state.createPrompt,
+      createFolder: state.createFolder,
+    }))
+  );
+  const language = useSettingsStore((state) => state.language);
   const t = i18n[language];
 
   const [search, setSearch] = useState('');

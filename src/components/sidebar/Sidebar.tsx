@@ -8,11 +8,24 @@ import { FolderPlus, Inbox, Star, Layers, Folder, Search, Settings, Download, Tr
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useEnvironment } from '@/hooks/useEnvironment';
-import SettingsModal from './SettingsModal';
+import dynamic from 'next/dynamic';
+import { useShallow } from 'zustand/react/shallow';
+
+const SettingsModal = dynamic(() => import('./SettingsModal'));
 
 export default function Sidebar() {
-  const { activeFolderId, activeTag, setActiveFolder, setActiveTag, createFolder, deleteFolder, setCommandPaletteOpen } = usePromptStore();
-  const { language } = useSettingsStore();
+  const { activeFolderId, activeTag, setActiveFolder, setActiveTag, createFolder, deleteFolder, setCommandPaletteOpen } = usePromptStore(
+    useShallow((state) => ({
+      activeFolderId: state.activeFolderId,
+      activeTag: state.activeTag,
+      setActiveFolder: state.setActiveFolder,
+      setActiveTag: state.setActiveTag,
+      createFolder: state.createFolder,
+      deleteFolder: state.deleteFolder,
+      setCommandPaletteOpen: state.setCommandPaletteOpen,
+    }))
+  );
+  const language = useSettingsStore((state) => state.language);
   const t = i18n[language];
   const { isWeb } = useEnvironment();
   

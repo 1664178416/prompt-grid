@@ -9,7 +9,7 @@ import { Mail, Key } from 'lucide-react';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login } = useAuthStore();
+  const login = useAuthStore((state) => state.login);
   const router = useRouter();
 
   const handleLogin = (e: React.FormEvent) => {
