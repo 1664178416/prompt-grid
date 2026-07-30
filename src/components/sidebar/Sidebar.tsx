@@ -6,7 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { FolderPlus, Inbox, Star, Layers, Folder, Search, Settings, Download, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useEnvironment } from '@/hooks/useEnvironment';
 import dynamic from 'next/dynamic';
 import { useShallow } from 'zustand/react/shallow';
@@ -30,7 +30,25 @@ export default function Sidebar() {
   const { isWeb } = useEnvironment();
   
   const folders = useLiveQuery(() => db.folders.toArray()) || [];
-  const prompts = useLiveQuery(() => db.prompts.toArray()) || [];
+  const livePrompts = useLiveQuery(() => db.prompts.toArray());
+
+  const promptStats = useMemo(() => {
+    const folderCounts = new Map<string, number>();
+    const tags = new Set<string>();
+    let favoriteCount = 0;
+    let totalCount = 0;
+
+    for (const prompt of livePrompts ?? []) {
+      totalCount += 1;
+      if (prompt.isFavorite) favoriteCount += 1;
+      if (prompt.folderId) {
+        folderCounts.set(prompt.folderId, (folderCounts.get(prompt.folderId) ?? 0) + 1);
+      }
+      for (const tag of prompt.tags ?? []) tags.add(tag);
+    }
+
+    return { favoriteCount, folderCounts, tags: Array.from(tags), totalCount };
+  }, [livePrompts]);
   
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -60,8 +78,8 @@ export default function Sidebar() {
       {/* Main Nav */}
       <div className="flex-1 overflow-y-auto py-3 px-2 space-y-6">
         <div className="space-y-0.5">
-          <NavItem icon={<Inbox size={16} />} label={t.allPrompts} active={activeFolderId === null} onClick={() => setActiveFolder(null)} count={prompts.length} />
-          <NavItem icon={<Star size={16} />} label={t.favorites} active={activeFolderId === 'favorites'} onClick={() => setActiveFolder('favorites')} count={prompts.filter(p => p.isFavorite).length} />
+          <NavItem icon={<Inbox size={16} />} label={t.allPrompts} active={activeFolderId === null} onClick={() => setActiveFolder(null)} count={promptStats.totalCount} />
+          <NavItem icon={<Star size={16} />} label={t.favorites} active={activeFolderId === 'favorites'} onClick={() => setActiveFolder('favorites')} count={promptStats.favoriteCount} />
         </div>
 
         {/* Folders */}
@@ -85,7 +103,7 @@ export default function Sidebar() {
                   label={folder.name} 
                   active={activeFolderId === folder.id} 
                   onClick={() => setActiveFolder(folder.id)} 
-                  count={prompts.filter(p => p.folderId === folder.id).length}
+                  count={promptStats.folderCounts.get(folder.id) ?? 0}
                 />
                 <button
                   onClick={(e) => {
@@ -126,7 +144,7 @@ export default function Sidebar() {
             <span>{t.tags}</span>
           </div>
           <div className="flex flex-wrap gap-1.5 px-3">
-            {Array.from(new Set(prompts.flatMap(p => p.tags || []))).map(tag => (
+            {promptStats.tags.map(tag => (
               <button
                 key={tag}
                 onClick={() => {

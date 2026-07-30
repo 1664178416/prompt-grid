@@ -38,10 +38,20 @@ export default function CommandPalette() {
   
   const filteredPrompts = useMemo(() => {
     const q = deferredSearch.toLowerCase();
-    return (allPrompts || []).filter(p => 
-      p.title.toLowerCase().includes(q) || 
-      p.content.toLowerCase().includes(q)
-    ).slice(0, MAX_PROMPT_RESULTS);
+    const results = [];
+
+    for (const prompt of allPrompts || []) {
+      if (
+        !q ||
+        prompt.title.toLowerCase().includes(q) ||
+        prompt.content.toLowerCase().includes(q)
+      ) {
+        results.push(prompt);
+        if (results.length === MAX_PROMPT_RESULTS) break;
+      }
+    }
+
+    return results;
   }, [allPrompts, deferredSearch]);
 
   const actions = useMemo(() => [
@@ -52,6 +62,7 @@ export default function CommandPalette() {
   ].filter(a => a.label.toLowerCase().includes(search.toLowerCase())), [search, t.createPromptAction, t.createFolderAction, t.exportData, t.importData]);
 
   const totalItems = filteredPrompts.length + actions.length;
+  const safeSelectedIndex = totalItems === 0 ? 0 : Math.min(selectedIndex, totalItems - 1);
 
   const handleExport = useCallback(async () => {
     downloadJsonBackup(await createBackupData());
@@ -142,12 +153,12 @@ export default function CommandPalette() {
       }
       if (e.key === 'Enter') {
         e.preventDefault();
-        executeAction(selectedIndex);
+        executeAction(safeSelectedIndex);
       }
     };
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
-  }, [executeAction, isCommandPaletteOpen, selectedIndex, totalItems]);
+  }, [executeAction, isCommandPaletteOpen, safeSelectedIndex, totalItems]);
 
   if (!isCommandPaletteOpen) return null;
 
@@ -198,10 +209,10 @@ export default function CommandPalette() {
                   onMouseEnter={() => setSelectedIndex(i)}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors",
-                    selectedIndex === i ? "bg-indigo-500/10 text-indigo-400" : "text-gray-300 hover:bg-panel-hover"
+                    safeSelectedIndex === i ? "bg-indigo-500/10 text-indigo-400" : "text-gray-300 hover:bg-panel-hover"
                   )}
                 >
-                  <FileText size={16} className={selectedIndex === i ? "text-indigo-400" : "text-gray-500"} />
+                  <FileText size={16} className={safeSelectedIndex === i ? "text-indigo-400" : "text-gray-500"} />
                   <span className="truncate">{p.title || t.untitled}</span>
                 </div>
               ))}
@@ -220,10 +231,10 @@ export default function CommandPalette() {
                     onMouseEnter={() => setSelectedIndex(i)}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors",
-                      selectedIndex === i ? "bg-indigo-500/10 text-indigo-400" : "text-gray-300 hover:bg-panel-hover"
+                      safeSelectedIndex === i ? "bg-indigo-500/10 text-indigo-400" : "text-gray-300 hover:bg-panel-hover"
                     )}
                   >
-                    <div className={selectedIndex === i ? "text-indigo-400" : "text-gray-500"}>{a.icon}</div>
+                    <div className={safeSelectedIndex === i ? "text-indigo-400" : "text-gray-500"}>{a.icon}</div>
                     <span>{a.label}</span>
                   </div>
                 );
