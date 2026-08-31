@@ -11,6 +11,9 @@ import { useRouter } from 'next/navigation';
 import { useHydrated } from '@/hooks/useHydrated';
 import { useSettingsStore, i18n } from '@/store/useSettingsStore';
 import { useShallow } from 'zustand/react/shallow';
+import dynamic from 'next/dynamic';
+
+const CommandPalette = dynamic(() => import('@/components/command-palette/CommandPalette'));
 
 function isEditableEventTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -57,6 +60,31 @@ function GlobalShortcuts() {
   }, [activeFolderId, activePromptId, createPrompt, setActivePrompt, deletePrompt, t.confirmDeletePrompt]);
 
   return null;
+}
+
+function CommandPaletteHost() {
+  const { isCommandPaletteOpen, setCommandPaletteOpen } = usePromptStore(
+    useShallow((state) => ({
+      isCommandPaletteOpen: state.isCommandPaletteOpen,
+      setCommandPaletteOpen: state.setCommandPaletteOpen,
+    }))
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setCommandPaletteOpen(!isCommandPaletteOpen);
+      } else if (event.key === 'Escape' && isCommandPaletteOpen) {
+        setCommandPaletteOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isCommandPaletteOpen, setCommandPaletteOpen]);
+
+  return isCommandPaletteOpen ? <CommandPalette /> : null;
 }
 
 export default function Home() {
@@ -159,6 +187,7 @@ export default function Home() {
       </div>
       
       <GlobalShortcuts />
+      <CommandPaletteHost />
     </main>
   );
 }

@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import CommandPalette from "@/components/command-palette/CommandPalette";
 
 export const metadata: Metadata = {
   title: "PromptGrid",
@@ -29,7 +28,6 @@ export default function RootLayout({
       <body className="font-sans bg-background text-foreground antialiased overflow-hidden selection:bg-indigo-500/30">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           {children}
-          <CommandPalette />
         </ThemeProvider>
         {process.env.NODE_ENV === "production" && (
           <Script id="pwa-bootstrap" strategy="beforeInteractive">

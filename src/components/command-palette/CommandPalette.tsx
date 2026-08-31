@@ -7,7 +7,6 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { Search, FileText, FolderPlus, Plus, Download, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { createBackupData, downloadJsonBackup, importBackupData, parseBackupData } from '@/lib/backup';
 import { useShallow } from 'zustand/react/shallow';
 
 const MAX_PROMPT_RESULTS = 50;
@@ -29,30 +28,28 @@ export default function CommandPalette() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const deferredSearch = useDeferredValue(search);
+  const normalizedSearch = deferredSearch.trim().toLowerCase();
 
-  const allPrompts = useLiveQuery(
-    () => isCommandPaletteOpen ? db.prompts.toArray() : [],
-    [isCommandPaletteOpen],
+  const filteredPrompts = useLiveQuery(
+    () => {
+      if (!isCommandPaletteOpen) return [];
+
+      const promptsByRecency = db.prompts.orderBy('updatedAt').reverse();
+      if (!normalizedSearch) {
+        return promptsByRecency.limit(MAX_PROMPT_RESULTS).toArray();
+      }
+
+      return promptsByRecency
+        .filter((prompt) => (
+          prompt.title.toLowerCase().includes(normalizedSearch) ||
+          prompt.content.toLowerCase().includes(normalizedSearch)
+        ))
+        .limit(MAX_PROMPT_RESULTS)
+        .toArray();
+    },
+    [isCommandPaletteOpen, normalizedSearch],
     []
   );
-  
-  const filteredPrompts = useMemo(() => {
-    const q = deferredSearch.toLowerCase();
-    const results = [];
-
-    for (const prompt of allPrompts || []) {
-      if (
-        !q ||
-        prompt.title.toLowerCase().includes(q) ||
-        prompt.content.toLowerCase().includes(q)
-      ) {
-        results.push(prompt);
-        if (results.length === MAX_PROMPT_RESULTS) break;
-      }
-    }
-
-    return results;
-  }, [allPrompts, deferredSearch]);
 
   const actions = useMemo(() => [
     { id: 'new-prompt', label: t.createPromptAction, icon: <Plus size={16} /> },
@@ -65,6 +62,7 @@ export default function CommandPalette() {
   const safeSelectedIndex = totalItems === 0 ? 0 : Math.min(selectedIndex, totalItems - 1);
 
   const handleExport = useCallback(async () => {
+    const { createBackupData, downloadJsonBackup } = await import('@/lib/backup');
     downloadJsonBackup(await createBackupData());
   }, []);
 
@@ -77,6 +75,7 @@ export default function CommandPalette() {
       if (!file) return;
       const text = await file.text();
       try {
+        const { importBackupData, parseBackupData } = await import('@/lib/backup');
         const data = parseBackupData(text);
         if (window.confirm(t.confirmImportMerge)) {
           await importBackupData(data, 'merge');
@@ -88,20 +87,6 @@ export default function CommandPalette() {
     };
     input.click();
   }, [t.confirmImportMerge, t.importError, t.importSuccess]);
-
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        setCommandPaletteOpen(!isCommandPaletteOpen);
-      }
-      if (e.key === 'Escape' && isCommandPaletteOpen) {
-        setCommandPaletteOpen(false);
-      }
-    };
-    document.addEventListener('keydown', down);
-    return () => document.removeEventListener('keydown', down);
-  }, [isCommandPaletteOpen, setCommandPaletteOpen]);
 
   useEffect(() => {
     if (isCommandPaletteOpen) {
