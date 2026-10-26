@@ -67,7 +67,17 @@ export default function PromptList() {
   const language = useSettingsStore((state) => state.language);
   const t = i18n[language];
   
-  const livePrompts = useLiveQuery(() => db.prompts.toArray());
+  const livePrompts = useLiveQuery(() => {
+    if (activeTag) {
+      return db.prompts.where('tags').equals(activeTag).toArray();
+    }
+
+    if (activeFolderId && activeFolderId !== 'favorites') {
+      return db.prompts.where('folderId').equals(activeFolderId).toArray();
+    }
+
+    return db.prompts.toArray();
+  }, [activeFolderId, activeTag]);
   const allPrompts = useMemo(() => livePrompts || [], [livePrompts]);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   
