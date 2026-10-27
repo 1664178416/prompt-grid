@@ -10,7 +10,7 @@ const source = ts.transpileModule(
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } },
 ).outputText;
 
-function loadBackup() {
+function loadBackup({ browser = false } = {}) {
   const calls = [];
   const table = (name) => ({
     clear: async () => { calls.push(`${name}.clear`); },
@@ -25,13 +25,34 @@ function loadBackup() {
     },
   };
   const exports = {};
-  runInNewContext(source, {
+  const context = {
     exports,
     require: (name) => {
       assert.equal(name, './db');
       return { db };
     },
-  });
+  };
+  if (browser) {
+    context.Blob = Blob;
+    context.setTimeout = setTimeout;
+    context.window = { setTimeout };
+    context.URL = {
+      createObjectURL: () => {
+        calls.push('URL.createObjectURL');
+        return 'blob:test';
+      },
+      revokeObjectURL: (url) => calls.push(['URL.revokeObjectURL', url]),
+    };
+    context.document = {
+      createElement: (tagName) => {
+        assert.equal(tagName, 'a');
+        return {
+          click: () => calls.push('anchor.click'),
+        };
+      },
+    };
+  }
+  runInNewContext(source, context);
   return { ...exports, calls };
 }
 
@@ -119,4 +140,18 @@ test('valid merge and replace retain their original write behavior', async () =>
       ['folders.bulkPut', data.folders], ['prompts.bulkPut', data.prompts],
     ]);
   }
+});
+
+test('keeps the backup Blob URL alive until the download starts', async () => {
+  const { downloadJsonBackup, calls } = loadBackup({ browser: true });
+
+  downloadJsonBackup(backup());
+  assert.deepEqual(calls, ['URL.createObjectURL', 'anchor.click']);
+
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.deepEqual(calls, [
+    'URL.createObjectURL',
+    'anchor.click',
+    ['URL.revokeObjectURL', 'blob:test'],
+  ]);
 });

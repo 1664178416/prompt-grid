@@ -99,7 +99,8 @@ export function downloadJsonBackup(data: BackupData) {
   anchor.href = url;
   anchor.download = `promptgrid-backup-${new Date().toISOString().split('T')[0]}.json`;
   anchor.click();
-  URL.revokeObjectURL(url);
+  // Let the browser begin the download before releasing the Blob URL.
+  window.setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 export function parseBackupData(text: string): BackupData {
