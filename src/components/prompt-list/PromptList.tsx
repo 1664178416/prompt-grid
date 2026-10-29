@@ -76,7 +76,7 @@ export default function PromptList() {
       return db.prompts.where('folderId').equals(activeFolderId).toArray();
     }
 
-    return db.prompts.toArray();
+    return db.prompts.orderBy('updatedAt').reverse().toArray();
   }, [activeFolderId, activeTag]);
   const allPrompts = useMemo(() => livePrompts || [], [livePrompts]);
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -97,7 +97,9 @@ export default function PromptList() {
       filtered = filtered.filter(p => p.title.toLowerCase().includes(q) || p.content.toLowerCase().includes(q));
     }
     
-    return [...filtered].sort((a, b) => b.updatedAt - a.updatedAt);
+    return activeTag || activeFolderId !== null
+      ? [...filtered].sort((a, b) => b.updatedAt - a.updatedAt)
+      : filtered;
   }, [allPrompts, activeFolderId, activeTag, deferredSearchQuery]);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
