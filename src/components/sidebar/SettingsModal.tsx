@@ -76,6 +76,9 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
         setDataMessage(t.importError);
       }
     };
+    reader.onerror = () => {
+      setDataMessage(t.importError);
+    };
     reader.readAsText(file);
     // Reset input
     e.target.value = '';
