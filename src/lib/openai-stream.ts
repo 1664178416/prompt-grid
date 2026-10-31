@@ -59,16 +59,24 @@ export async function readChatCompletionStream({
     return lines.some(processLine);
   };
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      buffer += decoder.decode();
-      if (buffer) processLine(buffer);
-      break;
-    }
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) {
+        buffer += decoder.decode();
+        if (buffer) processLine(buffer);
+        break;
+      }
 
-    buffer += decoder.decode(value, { stream: true });
-    if (processBuffer()) return;
+      buffer += decoder.decode(value, { stream: true });
+      if (processBuffer()) {
+        // DONE can arrive before the provider closes the connection.
+        await reader.cancel().catch(() => undefined);
+        return;
+      }
+    }
+  } finally {
+    reader.releaseLock();
   }
 }
 
