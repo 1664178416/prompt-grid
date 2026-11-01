@@ -187,7 +187,7 @@ export default function Editor() {
     let finalPrompt = content;
     variables.forEach(v => {
       const regex = new RegExp(`\\{\\{\\s*${escapeRegExp(v)}\\s*\\}\\}`, 'g');
-      finalPrompt = finalPrompt.replace(regex, filledVars[v] || '');
+      finalPrompt = finalPrompt.replace(regex, () => filledVars[v] || '');
     });
     return finalPrompt;
   };
