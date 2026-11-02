@@ -208,7 +208,7 @@ ${currentContent}`;
                   <SimpleEditor
                     value={parsedSystem || (status === 'optimizing' && !parsedSystem ? '...' : '')}
                     onValueChange={() => {}}
-                    highlight={code => code}
+                    highlight={code => <>{code}</>}
                     padding={16}
                     className="text-sm font-mono text-gray-300 min-h-full opacity-80"
                     textareaClassName="focus:outline-none cursor-default"
@@ -225,7 +225,7 @@ ${currentContent}`;
                   <SimpleEditor
                     value={parsedUser || (status === 'optimizing' && !parsedUser ? '...' : '')}
                     onValueChange={() => {}}
-                    highlight={code => code}
+                    highlight={code => <>{code}</>}
                     padding={16}
                     className="text-sm font-mono text-gray-300 min-h-full opacity-80"
                     textareaClassName="focus:outline-none cursor-default"
