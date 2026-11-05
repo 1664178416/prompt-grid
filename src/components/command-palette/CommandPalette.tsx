@@ -73,8 +73,8 @@ export default function CommandPalette() {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const text = await file.text();
       try {
+        const text = await file.text();
         const { importBackupData, parseBackupData } = await import('@/lib/backup');
         const data = parseBackupData(text);
         if (window.confirm(t.confirmImportMerge)) {
