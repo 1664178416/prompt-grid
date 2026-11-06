@@ -55,8 +55,8 @@ export default function PromptOptimizerModal({
   }, [isOpen]);
 
   const { parsedSystem, parsedUser } = useMemo(() => {
-    const sysMatch = resultText.match(/### SYSTEM PROMPT\n([\s\S]*?)(?:### USER PROMPT|$)/i);
-    const userMatch = resultText.match(/### USER PROMPT\n([\s\S]*)/i);
+    const sysMatch = resultText.match(/### SYSTEM PROMPT\r?\n([\s\S]*?)(?:### USER PROMPT|$)/i);
+    const userMatch = resultText.match(/### USER PROMPT\r?\n([\s\S]*)/i);
 
     return {
       parsedSystem: sysMatch?.[1]?.trim() || '',

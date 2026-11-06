@@ -16,9 +16,10 @@ const source = ts.transpileModule(
   } },
 ).outputText;
 
-function renderResult(system, user) {
+function renderResult(system, user, lineEnding = '\n') {
   // Seed the modal's completed response; render the real SimpleEditor with React.
-  const state = ['success', `### SYSTEM PROMPT\n${system}\n### USER PROMPT\n${user}`, ''];
+  const resultText = ['### SYSTEM PROMPT', system, '### USER PROMPT', user].join(lineEnding);
+  const state = ['success', resultText, ''];
   const exports = {};
   runInNewContext(source, {
     exports,
@@ -43,6 +44,15 @@ function renderResult(system, user) {
     currentSystemPrompt: '', currentContent: '',
   }));
 }
+
+test('previews both optimized prompts and enables applying a CRLF response', () => {
+  const html = renderResult('System instructions', 'User {{topic}}', '\r\n');
+  const previews = [...html.matchAll(/<pre\b[^>]*>([\s\S]*?)<\/pre>/g)];
+  assert.equal(previews.length, 2);
+  assert.match(previews[0][1], /System instructions/);
+  assert.match(previews[1][1], /User \{\{topic\}\}/);
+  assert.doesNotMatch(html, /<button\b[^>]*\sdisabled(?:\s|=|\/?>)/);
+});
 
 for (const section of ['system', 'user']) {
   test(`renders ${section} optimization output as literal text`, () => {
