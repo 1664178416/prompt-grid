@@ -20,16 +20,8 @@ function findBuilder(node) {
 findBuilder(editorSource);
 assert.ok(builder, 'Editor must provide its prompt substitution function');
 
-const utilsSource = ts.createSourceFile(
-  'utils.ts', readFileSync(new URL('../src/lib/utils.ts', import.meta.url), 'utf8'),
-  ts.ScriptTarget.Latest, true,
-);
-const escapeFunction = utilsSource.statements.find(
-  (node) => ts.isFunctionDeclaration(node) && node.name?.text === 'escapeRegExp',
-);
-assert.ok(escapeFunction);
 const source = ts.transpileModule(
-  `${escapeFunction.getText(utilsSource)}\nexports.buildFilledPrompt = ${builder};`,
+  `exports.buildFilledPrompt = ${builder};`,
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } },
 ).outputText;
 
@@ -50,4 +42,11 @@ test('retains repeated variables, whitespace, regex characters and empty values'
     'hello / hello / ');
   assert.equal(fill('{{a.b}} {{axb}}', ['a.b'], { 'a.b': 'literal' }), 'literal {{axb}}');
   assert.equal(fill('no variables', [], {}), 'no variables');
+});
+
+test('does not expand placeholders introduced by variable values', () => {
+  const values = { a: '{{b}}', b: 'B' };
+  assert.equal(fill('{{a}} / {{b}}', ['a', 'b'], values), '{{b}} / B');
+  assert.equal(fill('{{a}} / {{b}}', ['b', 'a'], values), '{{b}} / B');
+  assert.equal(fill('{{a}} / {{b}}', ['a', 'b'], { a: '{{ b }}', b: '' }), '{{ b }} / ');
 });

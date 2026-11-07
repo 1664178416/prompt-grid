@@ -6,7 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Prompt } from '@/lib/db';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Play, Copy, Star, Trash2, Folder, ChevronDown, Check, Loader2, Settings2, Save, FileJson, Sparkles } from 'lucide-react';
-import { cn, escapeRegExp, generateId, getErrorMessage } from '@/lib/utils';
+import { cn, generateId, getErrorMessage } from '@/lib/utils';
 import { readChatCompletionStream, readChatError, type ChatUsage } from '@/lib/openai-stream';
 import dynamic from 'next/dynamic';
 import SimpleEditor from 'react-simple-code-editor';
@@ -184,12 +184,10 @@ export default function Editor() {
   };
 
   const buildFilledPrompt = () => {
-    let finalPrompt = content;
-    variables.forEach(v => {
-      const regex = new RegExp(`\\{\\{\\s*${escapeRegExp(v)}\\s*\\}\\}`, 'g');
-      finalPrompt = finalPrompt.replace(regex, () => filledVars[v] || '');
+    return content.replace(/\{\{([^}]+)\}\}/g, (match, name: string) => {
+      const variable = name.trim();
+      return variables.includes(variable) ? (filledVars[variable] || '') : match;
     });
-    return finalPrompt;
   };
 
   const handleSystemPromptValueChange = (value: string) => {
