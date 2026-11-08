@@ -125,6 +125,8 @@ export default function Editor() {
         setTestResult('');
         setTestUsage(null);
         setTestDuration(null);
+        setFilledVars({});
+        setActiveTestCaseId(null);
         setIsSavingTestCase(false);
         setTestCaseName('');
       } else {
