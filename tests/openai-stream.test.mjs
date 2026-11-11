@@ -62,3 +62,27 @@ test('unlocks a failed response and propagates the read error', async () => {
   );
   assert.equal(body.locked, false);
 });
+
+test('reports an error event inside a successful HTTP response', async () => {
+  let cancelled = false;
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(
+        'data: keepalive\n\n'
+        + 'data: {"choices":[{"delta":{"content":"partial answer"}}]}\n\n'
+        + 'data: {"error":{"message":"generation interrupted"}}\n\n'
+        + 'data: {"choices":[{"delta":{"content":"should not be delivered"}}]}\n\n'
+        + 'data: [DONE]\n\n',
+      ));
+    },
+    cancel() { cancelled = true; },
+  });
+  const content = [];
+  await assert.rejects(
+    readChatCompletionStream({ response: new Response(body), onContent: (text) => content.push(text) }),
+    /generation interrupted/,
+  );
+  assert.deepEqual(content, ['partial answer']);
+  assert.equal(cancelled, true);
+  assert.equal(body.locked, false);
+});

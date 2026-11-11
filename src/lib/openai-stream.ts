@@ -5,6 +5,7 @@ export interface ChatUsage {
 }
 
 interface StreamChunk {
+  error?: { message?: unknown };
   choices?: Array<{
     delta?: {
       content?: string;
@@ -39,15 +40,22 @@ export async function readChatCompletionStream({
     const payload = trimmed.replace(/^data:\s*/, '');
     if (payload === '[DONE]') return true;
 
+    let parsed: StreamChunk | null;
     try {
-      const parsed = JSON.parse(payload) as StreamChunk;
-      const content = parsed.choices?.[0]?.delta?.content;
-
-      if (content) onContent(content);
-      if (parsed.usage) onUsage?.(parsed.usage);
+      parsed = JSON.parse(payload) as StreamChunk | null;
     } catch {
       // Ignore provider-specific keepalive or malformed chunks.
+      return false;
     }
+
+    const errorMessage = parsed?.error?.message;
+    if (typeof errorMessage === 'string' && errorMessage.trim()) {
+      throw new Error(errorMessage);
+    }
+
+    const content = parsed?.choices?.[0]?.delta?.content;
+    if (content) onContent(content);
+    if (parsed?.usage) onUsage?.(parsed.usage);
 
     return false;
   };
@@ -75,6 +83,9 @@ export async function readChatCompletionStream({
         return;
       }
     }
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
   } finally {
     reader.releaseLock();
   }
