@@ -50,3 +50,12 @@ test('does not expand placeholders introduced by variable values', () => {
   assert.equal(fill('{{a}} / {{b}}', ['b', 'a'], values), '{{b}} / B');
   assert.equal(fill('{{a}} / {{b}}', ['a', 'b'], { a: '{{ b }}', b: '' }), '{{ b }} / ');
 });
+
+test('treats prototype property names as ordinary unfilled or filled variables', () => {
+  for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+    assert.equal(fill(`Before {{${name}}} after`, [name], {}), 'Before  after');
+    assert.equal(fill(`Before {{${name}}} after`, [name], { [name]: 'user value' }),
+      'Before user value after');
+  }
+  assert.equal(fill('{{topic}}', ['topic'], Object.create({ topic: 'inherited' })), '');
+});

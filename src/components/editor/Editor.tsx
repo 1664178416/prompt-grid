@@ -188,7 +188,8 @@ export default function Editor() {
   const buildFilledPrompt = () => {
     return content.replace(/\{\{([^}]+)\}\}/g, (match, name: string) => {
       const variable = name.trim();
-      return variables.includes(variable) ? (filledVars[variable] || '') : match;
+      if (!variables.includes(variable)) return match;
+      return Object.hasOwn(filledVars, variable) ? filledVars[variable] : '';
     });
   };
 
@@ -602,7 +603,7 @@ export default function Editor() {
                     <label className="block text-xs font-medium text-gray-400 mb-1">{v}</label>
                     <input
                       type="text"
-                      value={filledVars[v] || ''}
+                      value={Object.hasOwn(filledVars, v) ? filledVars[v] : ''}
                       onChange={(e) => setFilledVars({...filledVars, [v]: e.target.value})}
                       className="w-full bg-background text-sm px-3 py-2 rounded border border-border focus:border-indigo-500/50 focus:outline-none transition-colors"
                       placeholder={`${v}...`}
