@@ -142,6 +142,30 @@ test('valid merge and replace retain their original write behavior', async () =>
   }
 });
 
+test('rejects duplicate backup IDs before any merge or replace writes', async () => {
+  for (const name of ['folders', 'prompts']) {
+    for (const mode of ['merge', 'replace']) {
+      const api = loadBackup();
+      const data = backup();
+      data[name].push({ ...data[name][0], [name === 'folders' ? 'name' : 'title']: 'Duplicate' });
+      assert.throws(() => api.parseBackupData(JSON.stringify(data)), /duplicate/i);
+      await assert.rejects(api.importBackupData(data, mode), /duplicate/i);
+      assert.deepEqual(api.calls, []);
+    }
+  }
+});
+
+test('allows distinct records and matching IDs across different tables', () => {
+  const { parseBackupData } = loadBackup();
+  const data = backup();
+  data.folders[0].id = data.prompts[0].id;
+  data.prompts[0].folderId = data.folders[0].id;
+  data.prompts.push({ ...data.prompts[0], id: 'prompt-2' });
+  const parsed = parseBackupData(JSON.stringify(data));
+  assert.equal(parsed.prompts.length, 2);
+  assert.equal(parsed.folders[0].id, parsed.prompts[0].id);
+});
+
 test('keeps the backup Blob URL alive until the download starts', async () => {
   const { downloadJsonBackup, calls } = loadBackup({ browser: true });
 

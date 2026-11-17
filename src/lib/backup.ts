@@ -64,14 +64,19 @@ function isPrompt(value: unknown): value is Prompt {
     && validTestCases;
 }
 
-function normalizeArray<T>(value: unknown, name: string, isValid: (entry: unknown) => entry is T): T[] {
+function normalizeArray<T extends { id: string }>(value: unknown, name: string, isValid: (entry: unknown) => entry is T): T[] {
   if (!Array.isArray(value)) {
     throw new Error(`Backup is missing ${name}.`);
   }
+  const ids = new Set<string>();
   for (const [index, entry] of value.entries()) {
     if (!isValid(entry)) {
       throw new Error(`Backup has invalid ${name}[${index}].`);
     }
+    if (ids.has(entry.id)) {
+      throw new Error(`Backup has duplicate ID in ${name}[${index}].`);
+    }
+    ids.add(entry.id);
   }
   return value as T[];
 }
