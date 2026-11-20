@@ -86,3 +86,45 @@ test('reports an error event inside a successful HTTP response', async () => {
   assert.equal(cancelled, true);
   assert.equal(body.locked, false);
 });
+
+for (const lineEnding of ['\r', '\n', '\r\n']) {
+  for (const fragmented of [false, true]) {
+    test(`reads ${JSON.stringify(lineEnding)} lines with fragmented=${fragmented}`, async () => {
+      const bytes = new TextEncoder().encode([
+        'data: {"choices":[{"delta":{"content":"你好"}}]}', '',
+        'data: {"usage":{"total_tokens":7}}', '', 'data: [DONE]', '', '',
+      ].join(lineEnding));
+      let cancelled = false;
+      let timer;
+      const body = new ReadableStream({
+        start(controller) {
+          if (fragmented) {
+            for (const byte of bytes) controller.enqueue(Uint8Array.of(byte));
+          } else {
+            controller.enqueue(bytes);
+          }
+          // Leave the connection open: DONE must finish reading without EOF.
+          // Close eventually so a missing DONE fails assertions instead of hanging.
+          timer = setTimeout(() => controller.close(), 1000);
+        },
+        cancel() { cancelled = true; },
+      });
+      const content = [];
+      let totalTokens;
+      const response = new Response(body);
+      try {
+        await readChatCompletionStream({
+          response,
+          onContent: (text) => content.push(text),
+          onUsage: (usage) => { totalTokens = usage.total_tokens; },
+        });
+        assert.deepEqual(content, ['你好']);
+        assert.equal(totalTokens, 7);
+        assert.equal(cancelled, true);
+        assert.equal(body.locked, false);
+      } finally {
+        clearTimeout(timer);
+      }
+    });
+  }
+}

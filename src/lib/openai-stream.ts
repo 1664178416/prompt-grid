@@ -61,7 +61,7 @@ export async function readChatCompletionStream({
   };
 
   const processBuffer = (flush = false) => {
-    const lines = buffer.split(/\r?\n/);
+    const lines = buffer.split(/\r\n|\r|\n/);
     buffer = flush ? '' : (lines.pop() ?? '');
 
     return lines.some(processLine);
